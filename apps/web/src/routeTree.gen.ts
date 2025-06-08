@@ -12,7 +12,9 @@
 
 import { Route as rootRoute } from './routes/__root'
 import { Route as IndexImport } from './routes/index'
-import { Route as AuthCallbackImport } from './routes/auth/callback'
+import { Route as DemoTanstackQueryImport } from './routes/demo.tanstack-query'
+import { Route as DemoFormSimpleImport } from './routes/demo.form.simple'
+import { Route as DemoFormAddressImport } from './routes/demo.form.address'
 
 // Create/Update Routes
 
@@ -22,9 +24,21 @@ const IndexRoute = IndexImport.update({
   getParentRoute: () => rootRoute,
 } as any)
 
-const AuthCallbackRoute = AuthCallbackImport.update({
-  id: '/auth/callback',
-  path: '/auth/callback',
+const DemoTanstackQueryRoute = DemoTanstackQueryImport.update({
+  id: '/demo/tanstack-query',
+  path: '/demo/tanstack-query',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const DemoFormSimpleRoute = DemoFormSimpleImport.update({
+  id: '/demo/form/simple',
+  path: '/demo/form/simple',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const DemoFormAddressRoute = DemoFormAddressImport.update({
+  id: '/demo/form/address',
+  path: '/demo/form/address',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -39,11 +53,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexImport
       parentRoute: typeof rootRoute
     }
-    '/auth/callback': {
-      id: '/auth/callback'
-      path: '/auth/callback'
-      fullPath: '/auth/callback'
-      preLoaderRoute: typeof AuthCallbackImport
+    '/demo/tanstack-query': {
+      id: '/demo/tanstack-query'
+      path: '/demo/tanstack-query'
+      fullPath: '/demo/tanstack-query'
+      preLoaderRoute: typeof DemoTanstackQueryImport
+      parentRoute: typeof rootRoute
+    }
+    '/demo/form/address': {
+      id: '/demo/form/address'
+      path: '/demo/form/address'
+      fullPath: '/demo/form/address'
+      preLoaderRoute: typeof DemoFormAddressImport
+      parentRoute: typeof rootRoute
+    }
+    '/demo/form/simple': {
+      id: '/demo/form/simple'
+      path: '/demo/form/simple'
+      fullPath: '/demo/form/simple'
+      preLoaderRoute: typeof DemoFormSimpleImport
       parentRoute: typeof rootRoute
     }
   }
@@ -53,37 +81,56 @@ declare module '@tanstack/react-router' {
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/auth/callback': typeof AuthCallbackRoute
+  '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/demo/form/address': typeof DemoFormAddressRoute
+  '/demo/form/simple': typeof DemoFormSimpleRoute
 }
 
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/auth/callback': typeof AuthCallbackRoute
+  '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/demo/form/address': typeof DemoFormAddressRoute
+  '/demo/form/simple': typeof DemoFormSimpleRoute
 }
 
 export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
-  '/auth/callback': typeof AuthCallbackRoute
+  '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/demo/form/address': typeof DemoFormAddressRoute
+  '/demo/form/simple': typeof DemoFormSimpleRoute
 }
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth/callback'
+  fullPaths:
+    | '/'
+    | '/demo/tanstack-query'
+    | '/demo/form/address'
+    | '/demo/form/simple'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth/callback'
-  id: '__root__' | '/' | '/auth/callback'
+  to: '/' | '/demo/tanstack-query' | '/demo/form/address' | '/demo/form/simple'
+  id:
+    | '__root__'
+    | '/'
+    | '/demo/tanstack-query'
+    | '/demo/form/address'
+    | '/demo/form/simple'
   fileRoutesById: FileRoutesById
 }
 
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AuthCallbackRoute: typeof AuthCallbackRoute
+  DemoTanstackQueryRoute: typeof DemoTanstackQueryRoute
+  DemoFormAddressRoute: typeof DemoFormAddressRoute
+  DemoFormSimpleRoute: typeof DemoFormSimpleRoute
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AuthCallbackRoute: AuthCallbackRoute,
+  DemoTanstackQueryRoute: DemoTanstackQueryRoute,
+  DemoFormAddressRoute: DemoFormAddressRoute,
+  DemoFormSimpleRoute: DemoFormSimpleRoute,
 }
 
 export const routeTree = rootRoute
@@ -97,14 +144,22 @@ export const routeTree = rootRoute
       "filePath": "__root.tsx",
       "children": [
         "/",
-        "/auth/callback"
+        "/demo/tanstack-query",
+        "/demo/form/address",
+        "/demo/form/simple"
       ]
     },
     "/": {
       "filePath": "index.tsx"
     },
-    "/auth/callback": {
-      "filePath": "auth/callback.tsx"
+    "/demo/tanstack-query": {
+      "filePath": "demo.tanstack-query.tsx"
+    },
+    "/demo/form/address": {
+      "filePath": "demo.form.address.tsx"
+    },
+    "/demo/form/simple": {
+      "filePath": "demo.form.simple.tsx"
     }
   }
 }
