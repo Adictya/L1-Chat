@@ -43,10 +43,10 @@ const app = issuer({
 		let user: User;
 		if (value.provider === "github") {
 			console.log(value.tokenset.access);
-			const ghuser = await getGithubUser(value.tokenset.access);
+			const ghUser = await getGithubUser(value.tokenset.access);
 			user = {
 				userID: nanoid(4),
-				username: ghuser.login,
+				username: ghUser.login,
 			};
 		} else {
 			throw new Error("Provider not supported");
