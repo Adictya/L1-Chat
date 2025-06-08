@@ -1,47 +1,17 @@
-import { Link } from '@tanstack/react-router'
+import { Separator } from "@/components/ui/separator";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 
-import TanStackChatHeaderUser from '../integrations/tanchat/header-user.tsx'
-
-export default function Header() {
-  return (
-    <header className="p-2 flex gap-2 bg-white text-black justify-between">
-      <nav className="flex flex-row">
-        <div className="px-2 font-bold">
-          <Link to="/">Home</Link>
-        </div>
-
-        <div className="px-2 font-bold">
-          <Link to="/demo/tanstack-query">TanStack Query</Link>
-        </div>
-
-        <div className="px-2 font-bold">
-          <Link to="/demo/sentry/testing">Sentry</Link>
-        </div>
-
-        <div className="px-2 font-bold">
-          <Link to="/example/chat">Chat</Link>
-        </div>
-
-        <div className="px-2 font-bold">
-          <Link to="/example/guitars">Guitar Demo</Link>
-        </div>
-
-        <div className="px-2 font-bold">
-          <Link to="/demo/start/server-funcs">Start - Server Functions</Link>
-        </div>
-
-        <div className="px-2 font-bold">
-          <Link to="/demo/start/api-request">Start - API Request</Link>
-        </div>
-
-        <div className="px-2 font-bold">
-          <Link to="/demo/store">Store</Link>
-        </div>
-      </nav>
-
-      <div>
-        <TanStackChatHeaderUser />
-      </div>
-    </header>
-  )
+export function SiteHeader() {
+	return (
+		<header className="group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 flex h-12 shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear">
+			<div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
+				<SidebarTrigger className="-ml-1" />
+				<Separator
+					orientation="vertical"
+					className="mx-2 data-[orientation=vertical]:h-4"
+				/>
+				<h1 className="text-base font-medium">Dashboard</h1>
+			</div>
+		</header>
+	);
 }

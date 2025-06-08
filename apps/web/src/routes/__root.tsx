@@ -1,72 +1,82 @@
 import {
-  Outlet,
-  HeadContent,
-  Scripts,
-  createRootRouteWithContext,
-} from '@tanstack/react-router'
-import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
+	Outlet,
+	HeadContent,
+	Scripts,
+	createRootRouteWithContext,
+	ClientOnly,
+} from "@tanstack/react-router";
+import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
-import Header from '../components/Header'
+import { SiteHeader } from "../components/Header";
 
-import TanStackQueryLayout from '../integrations/tanstack-query/layout.tsx'
+import TanStackQueryLayout from "../integrations/tanstack-query/layout.tsx";
 
-import appCss from '../styles.css?url'
+import appCss from "../styles.css?url";
 
-import type { QueryClient } from '@tanstack/react-query'
+import type { QueryClient } from "@tanstack/react-query";
 
-import type { TRPCRouter } from '@/integrations/trpc/router'
-import type { TRPCOptionsProxy } from '@trpc/tanstack-react-query'
+import type { TRPCRouter } from "@/integrations/trpc/router";
+import type { TRPCOptionsProxy } from "@trpc/tanstack-react-query";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar.tsx";
+import { AppSidebar } from "@/components/AppSidebar.tsx";
 
 interface MyRouterContext {
-  queryClient: QueryClient
+	queryClient: QueryClient;
 
-  trpc: TRPCOptionsProxy<TRPCRouter>
+	trpc: TRPCOptionsProxy<TRPCRouter>;
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
-  head: () => ({
-    meta: [
-      {
-        charSet: 'utf-8',
-      },
-      {
-        name: 'viewport',
-        content: 'width=device-width, initial-scale=1',
-      },
-      {
-        title: 'L1-Chat',
-      },
-    ],
-    links: [
-      {
-        rel: 'stylesheet',
-        href: appCss,
-      },
-    ],
-  }),
+	head: () => ({
+		meta: [
+			{
+				charSet: "utf-8",
+			},
+			{
+				name: "viewport",
+				content: "width=device-width, initial-scale=1",
+			},
+			{
+				title: "L1-Chat",
+			},
+		],
+		links: [
+			{
+				rel: "stylesheet",
+				href: appCss,
+			},
+		],
+	}),
 
-  component: () => (
-    <RootDocument>
-      {/* <Header /> */}
-
-      <Outlet />
-      <TanStackRouterDevtools />
-
-      <TanStackQueryLayout />
-    </RootDocument>
-  ),
-})
+	component: () => (
+		<RootDocument>
+			<ClientOnly fallback={<div></div>}>
+				<SidebarProvider>
+					<AppSidebar />
+					<SidebarInset>
+						<SiteHeader />
+						<div className="flex-1 flex">
+							<Outlet />
+						</div>
+					</SidebarInset>
+				</SidebarProvider>
+			</ClientOnly>
+			<TanStackRouterDevtools />
+			<TanStackQueryLayout />
+		</RootDocument>
+	),
+});
 
 function RootDocument({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  )
+	return (
+		<html lang="en">
+			<head>
+				<HeadContent />
+			</head>
+			<body className="dark">
+				{children}
+				<Scripts />
+			</body>
+		</html>
+	);
 }
