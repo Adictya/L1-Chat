@@ -1,12 +1,10 @@
 import {
 	pgTable,
-	serial,
 	varchar,
-	pgEnum,
 	timestamp,
-	decimal,
 	integer,
 	index,
+	text,
 } from "drizzle-orm/pg-core";
 
 export const account = pgTable(
@@ -30,13 +28,15 @@ export const conversation = pgTable("conversation", {
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export type Conversation = typeof conversation.$inferSelect;
+
 export const chatMessage = pgTable("chat_message", {
 	id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-	chatId: integer("chat_id")
+	conversationId: integer("conversation_id")
 		.notNull()
 		.references(() => conversation.id, { onDelete: "cascade" }),
-  role: varchar("role", { length: 255 }).notNull(),
-	content: varchar("content", { length: 255 }).notNull(),
+	role: varchar("role", { length: 255 }).notNull(),
+	content: text("content").notNull(),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -45,10 +45,10 @@ export type ChatMessage = typeof chatMessage.$inferSelect;
 
 export const chatInput = pgTable("chat_input", {
 	id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-	chatId: integer("chat_id")
+	conversationId: integer("conversation_id")
 		.notNull()
 		.references(() => conversation.id, { onDelete: "cascade" }),
-	input: varchar("input", { length: 255 }).notNull(),
+	input: text("input").notNull(),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

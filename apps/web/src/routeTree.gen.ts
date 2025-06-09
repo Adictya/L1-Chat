@@ -12,7 +12,9 @@
 
 import { Route as rootRoute } from './routes/__root'
 import { Route as IndexImport } from './routes/index'
+import { Route as SettingsProfileImport } from './routes/settings.profile'
 import { Route as DemoTanstackQueryImport } from './routes/demo.tanstack-query'
+import { Route as ChatsConversationIdImport } from './routes/chats/$conversationId'
 import { Route as DemoFormSimpleImport } from './routes/demo.form.simple'
 import { Route as DemoFormAddressImport } from './routes/demo.form.address'
 
@@ -24,9 +26,21 @@ const IndexRoute = IndexImport.update({
   getParentRoute: () => rootRoute,
 } as any)
 
+const SettingsProfileRoute = SettingsProfileImport.update({
+  id: '/settings/profile',
+  path: '/settings/profile',
+  getParentRoute: () => rootRoute,
+} as any)
+
 const DemoTanstackQueryRoute = DemoTanstackQueryImport.update({
   id: '/demo/tanstack-query',
   path: '/demo/tanstack-query',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const ChatsConversationIdRoute = ChatsConversationIdImport.update({
+  id: '/chats/$conversationId',
+  path: '/chats/$conversationId',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -53,11 +67,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexImport
       parentRoute: typeof rootRoute
     }
+    '/chats/$conversationId': {
+      id: '/chats/$conversationId'
+      path: '/chats/$conversationId'
+      fullPath: '/chats/$conversationId'
+      preLoaderRoute: typeof ChatsConversationIdImport
+      parentRoute: typeof rootRoute
+    }
     '/demo/tanstack-query': {
       id: '/demo/tanstack-query'
       path: '/demo/tanstack-query'
       fullPath: '/demo/tanstack-query'
       preLoaderRoute: typeof DemoTanstackQueryImport
+      parentRoute: typeof rootRoute
+    }
+    '/settings/profile': {
+      id: '/settings/profile'
+      path: '/settings/profile'
+      fullPath: '/settings/profile'
+      preLoaderRoute: typeof SettingsProfileImport
       parentRoute: typeof rootRoute
     }
     '/demo/form/address': {
@@ -81,14 +109,18 @@ declare module '@tanstack/react-router' {
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/chats/$conversationId': typeof ChatsConversationIdRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/settings/profile': typeof SettingsProfileRoute
   '/demo/form/address': typeof DemoFormAddressRoute
   '/demo/form/simple': typeof DemoFormSimpleRoute
 }
 
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/chats/$conversationId': typeof ChatsConversationIdRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/settings/profile': typeof SettingsProfileRoute
   '/demo/form/address': typeof DemoFormAddressRoute
   '/demo/form/simple': typeof DemoFormSimpleRoute
 }
@@ -96,7 +128,9 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
+  '/chats/$conversationId': typeof ChatsConversationIdRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/settings/profile': typeof SettingsProfileRoute
   '/demo/form/address': typeof DemoFormAddressRoute
   '/demo/form/simple': typeof DemoFormSimpleRoute
 }
@@ -105,15 +139,25 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/chats/$conversationId'
     | '/demo/tanstack-query'
+    | '/settings/profile'
     | '/demo/form/address'
     | '/demo/form/simple'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/demo/tanstack-query' | '/demo/form/address' | '/demo/form/simple'
+  to:
+    | '/'
+    | '/chats/$conversationId'
+    | '/demo/tanstack-query'
+    | '/settings/profile'
+    | '/demo/form/address'
+    | '/demo/form/simple'
   id:
     | '__root__'
     | '/'
+    | '/chats/$conversationId'
     | '/demo/tanstack-query'
+    | '/settings/profile'
     | '/demo/form/address'
     | '/demo/form/simple'
   fileRoutesById: FileRoutesById
@@ -121,14 +165,18 @@ export interface FileRouteTypes {
 
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ChatsConversationIdRoute: typeof ChatsConversationIdRoute
   DemoTanstackQueryRoute: typeof DemoTanstackQueryRoute
+  SettingsProfileRoute: typeof SettingsProfileRoute
   DemoFormAddressRoute: typeof DemoFormAddressRoute
   DemoFormSimpleRoute: typeof DemoFormSimpleRoute
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ChatsConversationIdRoute: ChatsConversationIdRoute,
   DemoTanstackQueryRoute: DemoTanstackQueryRoute,
+  SettingsProfileRoute: SettingsProfileRoute,
   DemoFormAddressRoute: DemoFormAddressRoute,
   DemoFormSimpleRoute: DemoFormSimpleRoute,
 }
@@ -144,7 +192,9 @@ export const routeTree = rootRoute
       "filePath": "__root.tsx",
       "children": [
         "/",
+        "/chats/$conversationId",
         "/demo/tanstack-query",
+        "/settings/profile",
         "/demo/form/address",
         "/demo/form/simple"
       ]
@@ -152,8 +202,14 @@ export const routeTree = rootRoute
     "/": {
       "filePath": "index.tsx"
     },
+    "/chats/$conversationId": {
+      "filePath": "chats/$conversationId.tsx"
+    },
     "/demo/tanstack-query": {
       "filePath": "demo.tanstack-query.tsx"
+    },
+    "/settings/profile": {
+      "filePath": "settings.profile.tsx"
     },
     "/demo/form/address": {
       "filePath": "demo.form.address.tsx"

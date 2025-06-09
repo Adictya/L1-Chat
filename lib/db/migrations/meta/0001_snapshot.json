@@ -1,6 +1,6 @@
 {
-  "id": "2a6a1c89-426c-48a2-85fa-425f6c511e9f",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "c56a1a03-e4ef-4e6c-89b4-4d4f2806321f",
+  "prevId": "2a6a1c89-426c-48a2-85fa-425f6c511e9f",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -105,7 +105,7 @@
         },
         "input": {
           "name": "input",
-          "type": "varchar(255)",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
@@ -181,7 +181,7 @@
         },
         "content": {
           "name": "content",
-          "type": "varchar(255)",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },

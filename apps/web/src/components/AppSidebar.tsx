@@ -1,67 +1,54 @@
-import { Calendar, Home, Inbox, Search, Settings } from "lucide-react"
+import { Calendar, Home, Inbox, Search, Settings } from "lucide-react";
 
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "@/components/ui/sidebar"
-
-// Menu items.
-const items = [
-  {
-    title: "Home",
-    url: "#",
-    icon: Home,
-  },
-  {
-    title: "Inbox",
-    url: "#",
-    icon: Inbox,
-  },
-  {
-    title: "Calendar",
-    url: "#",
-    icon: Calendar,
-  },
-  {
-    title: "Search",
-    url: "#",
-    icon: Search,
-  },
-  {
-    title: "Settings",
-    url: "#",
-    icon: Settings,
-  },
-]
+	Sidebar,
+	SidebarContent,
+	SidebarGroup,
+	SidebarGroupContent,
+	SidebarGroupLabel,
+	SidebarMenu,
+	SidebarMenuButton,
+	SidebarMenuItem,
+} from "@/components/ui/sidebar";
+import { Link, useRouter } from "@tanstack/react-router";
+import { useLiveQuery } from "@electric-sql/pglite-react";
+import { type Conversation, conversation } from "l1-db/schema";
+import db from "l1-db/db";
+import { MessageSquare } from "lucide-react";
 
 export function AppSidebar() {
-  return (
-    <Sidebar>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Application</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {items.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <a href={item.url}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-    </Sidebar>
-  )
+	const router = useRouter();
+	const conversations = useLiveQuery<Conversation>(
+		db.select().from(conversation).orderBy(conversation.createdAt).toSQL().sql,
+	);
+
+	return (
+		<Sidebar>
+			<SidebarContent>
+				<SidebarGroup>
+					<SidebarGroupLabel>Chats</SidebarGroupLabel>
+					<SidebarGroupContent>
+						<SidebarMenu>
+							{conversations?.rows.map((conv) => {
+								const isActive = router.state.location.pathname === `/chats/${conv.id}`;
+								return (
+									<SidebarMenuItem key={conv.id}>
+										<SidebarMenuButton asChild isActive={isActive}>
+											<Link
+												to="/chats/$conversationId"
+												params={{ conversationId: conv.id.toString() }}
+											>
+												<MessageSquare className="h-4 w-4" />
+												<span>{conv.title || "Untitled Chat"}</span>
+											</Link>
+										</SidebarMenuButton>
+									</SidebarMenuItem>
+								);
+							})}
+						</SidebarMenu>
+					</SidebarGroupContent>
+				</SidebarGroup>
+			</SidebarContent>
+		</Sidebar>
+	);
 }

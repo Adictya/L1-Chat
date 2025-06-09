@@ -1,15 +1,20 @@
 import type { MigrationConfig } from "drizzle-orm/migrator";
 import db from "./db";
 import migrations from "./migrations.json";
+import { chatMessage, conversation } from "./schema";
 
 export async function migrate() {
-  console.log("Running migration");
-  // @ts-expect-error: non public APIS
-  db.dialect.migrate(migrations, db.session, {
-    migrationsTable: "drizzle_migrations",
-  } satisfies Omit<MigrationConfig, "migrationsFolder">);
+	console.log("Running migration");
+	// @ts-expect-error: non public APIS
+	await db.dialect.migrate(migrations, db.session, {
+		migrationsTable: "drizzle_migrations",
+	} satisfies Omit<MigrationConfig, "migrationsFolder">);
 
+	const conversations = await db.select().from(conversation);
+	const chats = await db.select().from(chatMessage);
 
+	console.log("conversations", conversations);
+	console.log("chats", chats);
 
-  console.log("migration ran");
+	console.log("migration ran");
 }
