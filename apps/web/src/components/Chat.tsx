@@ -11,10 +11,27 @@ import { useChat } from "ai/react";
 import { useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { useLiveQuery, usePGlite } from "@electric-sql/pglite-react";
+import { Route } from "@/routes";
+import { chatMessage, conversation } from "l1-db";
+import type { ChatMessage } from "l1-db";
 // import CodeDisplayBlock from "./code-display-block";
+//
+import { streamText } from "ai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+
+const SYSTEM_PROMPT = `You are a helpful assistant`;
+
+const google = createGoogleGenerativeAI({
+	apiKey: "",
+});
 
 export default function ChatSupport() {
+	const db = Route.useRouteContext({ select: (ctx) => ctx.db });
 	const [isGenerating, setIsGenerating] = useState(false);
+	const msgs = useLiveQuery<ChatMessage>(
+		db.select().from(chatMessage).toSQL().sql,
+	);
 	const {
 		messages,
 		setMessages,
@@ -23,9 +40,27 @@ export default function ChatSupport() {
 		handleSubmit,
 		isLoading,
 	} = useChat({
+		fetch: async (_url, options) => {
+			const { messages } = JSON.parse(options!.body! as string);
+			console.log("Fetching");
+			return streamText({
+				model: google("gemini-2.0-flash"),
+				messages,
+				system: SYSTEM_PROMPT,
+				maxSteps: 10,
+			}).toDataStreamResponse();
+		},
+		initialMessages: msgs
+			? msgs.rows.map((row) => ({
+					id: `${row.id}`,
+					role: "assistant",
+					content: row.content,
+					createdAt: row.createdAt,
+				}))
+			: [],
 		onResponse(response) {
 			if (response) {
-				setIsGenerating(false);
+        
 			}
 		},
 		onError(error) {
@@ -33,7 +68,45 @@ export default function ChatSupport() {
 				setIsGenerating(false);
 			}
 		},
+		async onFinish(message) {
+			let conversations = await db
+				.select()
+				.from(conversation)
+				.limit(1)
+				.execute();
+			if (conversations.length <= 0) {
+				conversations = await db
+					.insert(conversation)
+					.values({
+						title: message.content,
+					})
+					.returning()
+					.execute();
+			}
+			await db
+				.insert(chatMessage)
+				.values({
+					chatId: conversations[0].id,
+					role: message.role,
+					content: message.content,
+				})
+				.execute();
+		},
 	});
+
+	useEffect(() => {
+		if (msgs) {
+			console.log("Updated via live query");
+			setMessages(
+				msgs.rows.map((row) => ({
+					id: `${row.id}`,
+					role: "assistant",
+					content: row.content,
+					createdAt: row.createdAt,
+				})),
+			);
+		}
+	}, [msgs?.rows]);
 
 	const messagesRef = useRef<HTMLDivElement>(null);
 	const formRef = useRef<HTMLFormElement>(null);

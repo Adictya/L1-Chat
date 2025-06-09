@@ -8,9 +8,11 @@ import TanStackQueryLayout from "../integrations/tanstack-query/layout.tsx";
 import type { QueryClient } from "@tanstack/react-query";
 import { AppSidebar } from "@/components/AppSidebar.tsx";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar.tsx";
+import type { DB } from "l1-db";
 
 interface MyRouterContext {
 	queryClient: QueryClient;
+	db: DB;
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({

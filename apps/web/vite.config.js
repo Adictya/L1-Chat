@@ -16,6 +16,9 @@ export default defineConfig({
 		viteReact(),
 		tailwindcss(),
 	],
+	optimizeDeps: {
+		exclude: ["@electric-sql/pglite"],
+	},
 	test: {
 		globals: true,
 		environment: "jsdom",

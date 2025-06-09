@@ -11,7 +11,19 @@
         "typescript": "^5",
       },
     },
-    "apps/l1-web": {
+    "apps/server": {
+      "name": "server",
+      "dependencies": {
+        "@openauthjs/openauth": "^0.4.3",
+        "hono": "^4.7.11",
+        "l1-env": "workspace:*",
+        "nanoid": "^5.1.5",
+      },
+      "devDependencies": {
+        "wrangler": "^4.4.0",
+      },
+    },
+    "apps/web": {
       "name": "l1-web",
       "dependencies": {
         "@radix-ui/react-label": "^2.1.7",
@@ -29,6 +41,7 @@
         "@tanstack/router-plugin": "^1.114.3",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
+        "l1-db": "workspace:*",
         "lucide-react": "^0.476.0",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
@@ -51,24 +64,14 @@
         "web-vitals": "^4.2.4",
       },
     },
-    "apps/server": {
-      "name": "server",
-      "dependencies": {
-        "@openauthjs/openauth": "^0.4.3",
-        "hono": "^4.7.11",
-        "l1-env": "workspace:*",
-        "nanoid": "^5.1.5",
-      },
-      "devDependencies": {
-        "wrangler": "^4.4.0",
-      },
-    },
     "apps/web2": {
       "name": "l1-web-ref",
       "dependencies": {
         "@ai-sdk/anthropic": "^1.1.17",
+        "@ai-sdk/google": "^1.2.19",
         "@ai-sdk/react": "^1.1.23",
         "@electric-sql/pglite": "^0.3.3",
+        "@electric-sql/pglite-react": "^0.2.21",
         "@modelcontextprotocol/sdk": "^1.8.0",
         "@openauthjs/openauth": "^0.4.3",
         "@radix-ui/react-avatar": "^1.1.10",
@@ -91,7 +94,7 @@
         "@trpc/client": "^11.0.0",
         "@trpc/server": "^11.0.0",
         "@trpc/tanstack-react-query": "^11.0.0",
-        "ai": "^4.1.65",
+        "ai": "^4.3.16",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "drizzle-orm": "^0.44.2",
@@ -154,6 +157,8 @@
   },
   "packages": {
     "@ai-sdk/anthropic": ["@ai-sdk/anthropic@1.2.12", "", { "dependencies": { "@ai-sdk/provider": "1.1.3", "@ai-sdk/provider-utils": "2.2.8" }, "peerDependencies": { "zod": "^3.0.0" } }, "sha512-YSzjlko7JvuiyQFmI9RN1tNZdEiZxc+6xld/0tq/VkJaHpEzGAb1yiNxxvmYVcjvfu/PcvCxAAYXmTYQQ63IHQ=="],
+
+    "@ai-sdk/google": ["@ai-sdk/google@1.2.19", "", { "dependencies": { "@ai-sdk/provider": "1.1.3", "@ai-sdk/provider-utils": "2.2.8" }, "peerDependencies": { "zod": "^3.0.0" } }, "sha512-Xgl6eftIRQ4srUdCzxM112JuewVMij5q4JLcNmHcB68Bxn9dpr3MVUSPlJwmameuiQuISIA8lMB+iRiRbFsaqA=="],
 
     "@ai-sdk/provider": ["@ai-sdk/provider@1.1.3", "", { "dependencies": { "json-schema": "^0.4.0" } }, "sha512-qZMxYJ0qqX/RfnuIaab+zp8UAeJn/ygXXAffR5I4N0n1IrvA6qBsjc8hXLmBiMV2zoXlifkacF7sEFnYnjBcqg=="],
 
@@ -266,6 +271,8 @@
     "@drizzle-team/brocli": ["@drizzle-team/brocli@0.10.2", "", {}, "sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w=="],
 
     "@electric-sql/pglite": ["@electric-sql/pglite@0.3.3", "", {}, "sha512-JrvHOx9q0yvKEby0bK8qzGTVw6K+yEg8enxDWb2IwNKr5XZxRrBb+GNIqoAIP7yXyhRg5jcENWmdHmtnAT87vA=="],
+
+    "@electric-sql/pglite-react": ["@electric-sql/pglite-react@0.2.21", "", { "peerDependencies": { "@electric-sql/pglite": "0.3.3", "react": "^18.0.0 || ^19.0.0 || ^19.0.0-rc" } }, "sha512-DDx001vIDUeedh5xBmAihuZmlz0vDU1CZ13o5ozCK4K2PAeFkWTBSoXUVs/5rtMiNiy+A9kuay0kYjYq5ksmqg=="],
 
     "@emnapi/runtime": ["@emnapi/runtime@1.4.3", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-pBPWdu6MLKROBX05wSNKcNb++m5Er+KQ9QkB+WVM+pW2Kx9hoSrVTnu3BdkI5eBLZoKu/J6mW/B6i6bJB2ytXQ=="],
 
@@ -1549,7 +1556,7 @@
 
     "l1-env": ["l1-env@workspace:lib/env"],
 
-    "l1-web": ["l1-web@workspace:apps/l1-web"],
+    "l1-web": ["l1-web@workspace:apps/web"],
 
     "l1-web-ref": ["l1-web-ref@workspace:apps/web2"],
 
