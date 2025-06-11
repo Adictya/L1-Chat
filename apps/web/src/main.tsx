@@ -5,20 +5,19 @@ import { PGliteProvider } from "@electric-sql/pglite-react";
 
 import * as TanStackQueryProvider from "./integrations/tanstack-query/root-provider.tsx";
 
-import db, { pgLiteClient } from "l1-db";
-
 // Import the generated route tree
 import { routeTree } from "./routeTree.gen";
 
 import "./styles.css";
 import reportWebVitals from "./reportWebVitals.ts";
+import pg from "./integrations/drizzle-pglite/pglite.ts";
 
 // Create a new router instance
 const router = createRouter({
 	routeTree,
 	context: {
 		...TanStackQueryProvider.getContext(),
-		db,
+		pg,
 	},
 	defaultPreload: "intent",
 	scrollRestoration: true,
@@ -39,7 +38,7 @@ if (rootElement && !rootElement.innerHTML) {
 	const root = ReactDOM.createRoot(rootElement);
 	root.render(
 		<StrictMode>
-			<PGliteProvider db={pgLiteClient}>
+			<PGliteProvider db={pg}>
 				<TanStackQueryProvider.Provider>
 					<RouterProvider router={router} />
 				</TanStackQueryProvider.Provider>

@@ -5,31 +5,29 @@ import { Button } from "./ui/button";
 import { Send } from "lucide-react";
 import { ChatInput } from "./ui/chat/chat-input";
 import { useChat } from "@ai-sdk/react";
-import db, { chatMessage, type ChatMessage, conversation } from "l1-db";
+import type { ChatMessage } from "l1-db";
 import { Route } from "@/routes";
-import { eq } from "drizzle-orm";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { streamText } from "ai";
+import { streamText, type UIMessage } from "ai";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useNavigate } from "@tanstack/react-router";
-import React from "react";
-import { usePGlite } from "@electric-sql/pglite-react";
+import type React from "react";
+import { createConversation, addMessage, updateMessage } from "@/integrations/drizzle-pglite/actions";
 
 const google = createGoogleGenerativeAI({
-	apiKey: "",
+	apiKey: "AIzaSyDPUk7hKxcASKxD9-phqeXb0lHaKmqExxg",
 });
 
 interface ChatViewProps {
 	conversationId?: number;
 	storedMessages: ChatMessage[];
 }
+
 export default function ChatView({
 	conversationId,
 	storedMessages,
 }: ChatViewProps) {
-	// const db = Route.useRouteContext({ select: (ctx) => ctx.db });
-	const pgLite = usePGlite();
 	const messagesRef = useRef<HTMLDivElement>(null);
 	const formRef = useRef<HTMLFormElement>(null);
 	const navigate = useNavigate();
@@ -37,6 +35,8 @@ export default function ChatView({
 	const [pendingConversationId, setPendingConversationId] = useState<
 		number | undefined
 	>(conversationId);
+
+	const [myMessages, setMyMessages] = useState<UIMessage[]>([]);
 
 	const {
 		status,
@@ -49,7 +49,7 @@ export default function ChatView({
 		streamProtocol: "data",
 		fetch: async (_url, options) => {
 			const { messages: currentMessages } = JSON.parse(
-				options!.body! as string,
+				options?.body as string,
 			);
 
 			// Persist user message before streaming AI response
@@ -59,13 +59,8 @@ export default function ChatView({
 				const title =
 					currentMessages[currentMessages.length - 1]?.content?.slice(0, 30) ||
 					"New Chat";
-				const newConvs = await db
-					.insert(conversation)
-					.values({ title })
-					.returning()
-					.execute();
-				if (newConvs.length > 0) {
-					convId = newConvs[0].id;
+				convId = await createConversation(title);
+				if (convId) {
 					setPendingConversationId(convId);
 					// Redirect to new conversation URL
 					navigate({
@@ -81,13 +76,7 @@ export default function ChatView({
 			const userMsg = currentMessages[currentMessages.length - 1];
 			if (userMsg && userMsg.role === "user") {
 				// Non-blocking insert
-				db.insert(chatMessage)
-					.values({
-						conversationId: convId,
-						role: "user",
-						content: userMsg.content,
-					})
-					.execute();
+				addMessage(convId, "user", userMsg.content);
 			}
 
 			// Stream AI response and persist as it comes in
@@ -106,36 +95,12 @@ export default function ChatView({
 					assistantContent += text;
 					if (!assistantMsgId) {
 						try {
-							const res = await pgLite.query<{ id: number }>(
-								db
-									.insert(chatMessage)
-									.values({
-										conversationId: convId!,
-										role: "assistant",
-										content: assistantContent,
-									})
-									.returning()
-									.toSQL().sql,
-								db
-									.insert(chatMessage)
-									.values({
-										conversationId: convId!,
-										role: "assistant",
-										content: assistantContent,
-									})
-									.returning()
-									.toSQL().params,
-							);
-							assistantMsgId = res.rows[0]?.id;
+							assistantMsgId = await addMessage(convId, "assistant", assistantContent);
 						} catch (e) {
 							console.error("error while inserting", e);
 						}
 					} else {
-						await db
-							.update(chatMessage)
-							.set({ content: assistantContent })
-							.where(eq(chatMessage.id, assistantMsgId))
-							.execute();
+						await updateMessage(assistantMsgId, assistantContent);
 					}
 				}
 			})();
@@ -146,56 +111,55 @@ export default function ChatView({
 
 	useEffect(() => {
 		if (storedMessages.length > 0) {
-			setMessages(
-				storedMessages.map((row) => ({
-					id: `${row.id}`,
-					role: row.role === "user" ? "user" : "assistant",
-					content: row.content,
-					createdAt: new Date(row.createdAt),
-				})),
+			const temp = storedMessages.map(
+				(row) =>
+					({
+						id: `${row.id}`,
+						role: row.role === "user" ? "user" : "assistant",
+						content: row.content,
+						createdAt: new Date(row.createdAt),
+					}) as UIMessage,
 			);
+			setMessages(temp);
+			setMyMessages(temp);
 		}
-	}, [storedMessages]);
+	}, [storedMessages, setMessages]);
+
+	useEffect(() => {
+		console.log("My messages", myMessages);
+	}, [myMessages]);
 
 	return (
 		<div className="flex flex-col flex-1 h-[calc(100vh-48px)]">
 			<div className="flex-1 overflow-y-auto p-4">
 				<ChatMessageList ref={messagesRef}>
-					{messages &&
-						messages.map((message, index) => (
-							<ChatBubble
-								key={index}
-								variant={message.role == "user" ? "sent" : "received"}
+					{myMessages?.map((message) => (
+						<ChatBubble
+							key={message.id}
+							variant={message.role === "user" ? "sent" : "received"}
+						>
+							<ChatBubbleMessage
+								variant={message.role === "user" ? "sent" : "received"}
 							>
-								<ChatBubbleMessage
-									variant={message.role == "user" ? "sent" : "received"}
-								>
-									<Markdown key={index} remarkPlugins={[remarkGfm]}>
-										{message.parts
-											.filter((msg) => msg.type === "text")
-											.map((msg) => msg.text)
-											.join("")}
-									</Markdown>
-									{/* {message.content */}
-									{/* 	.split("```") */}
-									{/* 	.map((part: string, index: number) => { */}
-									{/* 		if (index % 2 === 0) { */}
-									{/* 			return ( */}
-									{/* 				<Markdown key={index} remarkPlugins={[remarkGfm]}> */}
-									{/* 					{part} */}
-									{/* 				</Markdown> */}
-									{/* 			); */}
-									{/* 		} else { */}
-									{/* 			return ( */}
-									{/* 				<pre className=" pt-2" key={index}> */}
-									{/* 					<CodeDisplayBlock code={part} lang="" /> */}
-									{/* 				</pre> */}
-									{/* 			); */}
-									{/* 		} */}
-									{/* 	})} */}
-								</ChatBubbleMessage>
-							</ChatBubble>
-						))}
+								{message.content
+									.split("```")
+									.map((part: string, i: number) => {
+										if (i % 2 === 0) {
+											return (
+												<Markdown key={`${message.id}-${i}`} remarkPlugins={[remarkGfm]}>
+													{part}
+												</Markdown>
+											);
+										}
+										return (
+											<pre className="pt-2" key={`${message.id}-${i}`}>
+												{part}
+											</pre>
+										);
+									})}
+							</ChatBubbleMessage>
+						</ChatBubble>
+					))}
 
 					{status === "submitted" && (
 						<ChatBubble variant="received">

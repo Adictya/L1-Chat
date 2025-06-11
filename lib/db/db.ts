@@ -2,6 +2,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { live } from "@electric-sql/pglite/live";
 import * as schema from "./schema";
+import { QueryBuilder } from "drizzle-orm/pg-core";
 
 export const pgLiteClient = await PGlite.create({
 	dataDir: "idb://l1-chat-db",
@@ -10,8 +11,8 @@ export const pgLiteClient = await PGlite.create({
 	},
 });
 
-const db = drizzle({ client: pgLiteClient, schema });
+const db = new QueryBuilder();
 
-export type DB = typeof db
+export type DB = typeof db;
 
 export default db;

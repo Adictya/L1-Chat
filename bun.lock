@@ -42,13 +42,16 @@
         "@tanstack/react-query-devtools": "^5.66.5",
         "@tanstack/react-router": "^1.114.3",
         "@tanstack/react-router-devtools": "^1.114.3",
+        "@tanstack/react-store": "^0.7.1",
         "@tanstack/router-plugin": "^1.114.3",
+        "@tanstack/store": "^0.7.1",
         "ai": "^4.3.16",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "drizzle-orm": "^0.44.2",
         "l1-db": "workspace:*",
         "lucide-react": "^0.476.0",
+        "nanoid": "^5.1.5",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
         "react-markdown": "^10.1.0",
@@ -57,6 +60,7 @@
         "tailwindcss": "^4.0.6",
         "tailwindcss-animate": "^1.0.7",
         "zod": "^3.24.2",
+        "zustand": "^5.0.5",
       },
       "devDependencies": {
         "@biomejs/biome": "1.9.4",
@@ -74,6 +78,20 @@
     },
     "lib/db": {
       "name": "l1-db",
+      "dependencies": {
+        "@electric-sql/pglite": "^0.3.3",
+        "drizzle-orm": "^0.44.2",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "drizzle-kit": "^0.31.1",
+      },
+      "peerDependencies": {
+        "typescript": "^5",
+      },
+    },
+    "lib/db-sqlite": {
+      "name": "l1-db-sqlite",
       "dependencies": {
         "@electric-sql/pglite": "^0.3.3",
         "drizzle-orm": "^0.44.2",
@@ -1303,6 +1321,8 @@
 
     "l1-db": ["l1-db@workspace:lib/db"],
 
+    "l1-db-sqlite": ["l1-db-sqlite@workspace:lib/db-sqlite"],
+
     "l1-env": ["l1-env@workspace:lib/env"],
 
     "l1-web": ["l1-web@workspace:apps/web"],
@@ -2050,6 +2070,8 @@
     "zod": ["zod@3.25.56", "", {}, "sha512-rd6eEF3BTNvQnR2e2wwolfTmUTnp70aUTqr0oaGbHifzC3BKJsoV+Gat8vxUMR1hwOKBs6El+qWehrHbCpW6SQ=="],
 
     "zod-to-json-schema": ["zod-to-json-schema@3.24.5", "", { "peerDependencies": { "zod": "^3.24.1" } }, "sha512-/AuWwMP+YqiPbsJx5D6TfgRTc4kTLjsh5SOcd4bLsfUg2RcEXrFMJl1DGgdHy2aCfsIA/cr/1JM0xcB2GZji8g=="],
+
+    "zustand": ["zustand@5.0.5", "", { "peerDependencies": { "@types/react": ">=18.0.0", "immer": ">=9.0.6", "react": ">=18.0.0", "use-sync-external-store": ">=1.2.0" }, "optionalPeers": ["@types/react", "immer", "react", "use-sync-external-store"] }, "sha512-mILtRfKW9xM47hqxGIxCv12gXusoY/xTSHBYApXozR0HmQv299whhBeeAcRy+KrPPybzosvJBCOmVjq6x12fCg=="],
 
     "zwitch": ["zwitch@2.0.4", "", {}, "sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A=="],
 

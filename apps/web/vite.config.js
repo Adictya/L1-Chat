@@ -28,4 +28,8 @@ export default defineConfig({
 			"@": resolve(__dirname, "./src"),
 		},
 	},
+	worker: {
+		format: "es",
+		plugins: [viteReact()],
+	},
 });

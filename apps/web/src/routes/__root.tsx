@@ -8,11 +8,14 @@ import TanStackQueryLayout from "../integrations/tanstack-query/layout.tsx";
 import type { QueryClient } from "@tanstack/react-query";
 import { AppSidebar } from "@/components/AppSidebar.tsx";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar.tsx";
-import type { DB } from "l1-db";
+// import type { SyncWorker } from "@/sync/worker.ts";
+// import type { PGliteWorker } from "@electric-sql/pglite/worker";
+import type { PGliteWithLive } from "@electric-sql/pglite/live";
 
 interface MyRouterContext {
 	queryClient: QueryClient;
-	db: DB;
+	// syncWorker: SyncWorker;
+	pg: PGliteWithLive;
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({

@@ -1,5 +1,3 @@
-import { Calendar, Home, Inbox, Search, Settings } from "lucide-react";
-
 import {
 	Sidebar,
 	SidebarContent,
@@ -11,16 +9,12 @@ import {
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { Link, useRouter } from "@tanstack/react-router";
-import { useLiveQuery } from "@electric-sql/pglite-react";
-import { type Conversation, conversation } from "l1-db/schema";
-import db from "l1-db/db";
 import { MessageSquare } from "lucide-react";
+import { useSubscribeConversations } from "@/integrations/drizzle-pglite/actions";
 
 export function AppSidebar() {
 	const router = useRouter();
-	const conversations = useLiveQuery<Conversation>(
-		db.select().from(conversation).orderBy(conversation.createdAt).toSQL().sql,
-	);
+	const conversations = useSubscribeConversations();
 
 	return (
 		<Sidebar>
@@ -29,8 +23,9 @@ export function AppSidebar() {
 					<SidebarGroupLabel>Chats</SidebarGroupLabel>
 					<SidebarGroupContent>
 						<SidebarMenu>
-							{conversations?.rows.map((conv) => {
-								const isActive = router.state.location.pathname === `/chats/${conv.id}`;
+							{conversations.map((conv) => {
+								const isActive =
+									router.state.location.pathname === `/chats/${conv.id}`;
 								return (
 									<SidebarMenuItem key={conv.id}>
 										<SidebarMenuButton asChild isActive={isActive}>
