@@ -10,6 +10,10 @@
   "scripts": {
     "generate-migrations": "bun x drizzle-kit generate && bun run ./scripts/compile-migrations.ts"
   },
+  "exports": {
+    ".": "./index.ts",
+    "./worker": "./src/pglite-worker.ts"
+  },
   "peerDependencies": {
     "typescript": "^5"
   },
