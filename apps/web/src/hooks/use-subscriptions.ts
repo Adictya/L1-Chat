@@ -3,7 +3,6 @@ import {
 	useLiveQuery,
 } from "@electric-sql/pglite-react";
 import type { Query } from "drizzle-orm";
-import type { PgRelationalQuery } from "drizzle-orm/pg-core/query-builders/query";
 
 interface LoadingState {
 	status: "loading";

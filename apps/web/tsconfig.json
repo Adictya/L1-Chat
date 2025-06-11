@@ -1,5 +1,5 @@
 {
-  "include": ["**/*.ts", "**/*.tsx"],
+  "include": ["**/*.ts", "**/*.tsx", "../../.git/web3/ChatOld.tsx", "../../.git/web3/$conversationIdOld.tsx"],
   "compilerOptions": {
     "target": "esnext",
     "jsx": "react-jsx",

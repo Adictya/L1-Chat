@@ -30,7 +30,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 					</div>
 				</SidebarInset>
 			</SidebarProvider>
-			<TanStackRouterDevtools />
+			<TanStackRouterDevtools position="top-right"/>
 			<TanStackQueryLayout />
 		</>
 	),

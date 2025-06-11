@@ -13,7 +13,11 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useNavigate } from "@tanstack/react-router";
 import type React from "react";
-import { createConversation, addMessage, updateMessage } from "@/integrations/drizzle-pglite/actions";
+import {
+	createConversation,
+	addMessage,
+	updateMessage,
+} from "@/integrations/drizzle-pglite/actions";
 
 const google = createGoogleGenerativeAI({
 	apiKey: "AIzaSyDPUk7hKxcASKxD9-phqeXb0lHaKmqExxg",
@@ -38,76 +42,80 @@ export default function ChatView({
 
 	const [myMessages, setMyMessages] = useState<UIMessage[]>([]);
 
-	const {
-		status,
-		messages,
-		setMessages,
-		input,
-		handleInputChange,
-		handleSubmit,
-	} = useChat({
-		streamProtocol: "data",
-		fetch: async (_url, options) => {
-			const { messages: currentMessages } = JSON.parse(
-				options?.body as string,
-			);
+	const { status, setMessages, input, handleInputChange, handleSubmit } =
+		useChat({
+			streamProtocol: "data",
+			fetch: async (_url, options) => {
+				const { messages: currentMessages } = JSON.parse(
+					options?.body as string,
+				);
 
-			// Persist user message before streaming AI response
-			let convId = pendingConversationId;
-			if (!convId) {
-				// Create new conversation
-				const title =
-					currentMessages[currentMessages.length - 1]?.content?.slice(0, 30) ||
-					"New Chat";
-				convId = await createConversation(title);
-				if (convId) {
-					setPendingConversationId(convId);
-					// Redirect to new conversation URL
-					navigate({
-						to: "/chats/$conversationId",
-						params: { conversationId: convId.toString() },
-					});
-				} else {
-					throw new Error("Failed to create conversation");
-				}
-			}
-
-			// Persist user message
-			const userMsg = currentMessages[currentMessages.length - 1];
-			if (userMsg && userMsg.role === "user") {
-				// Non-blocking insert
-				addMessage(convId, "user", userMsg.content);
-			}
-
-			// Stream AI response and persist as it comes in
-			let assistantMsgId: number | null = null;
-			let assistantContent = "";
-			const stream = streamText({
-				model: google("gemini-2.0-flash"),
-				messages: currentMessages,
-				system: "You are a helpful assistant",
-				maxSteps: 10,
-			});
-
-			// Attach streaming handler for persistence using for-await-of
-			(async () => {
-				for await (const text of stream.textStream) {
-					assistantContent += text;
-					if (!assistantMsgId) {
-						try {
-							assistantMsgId = await addMessage(convId, "assistant", assistantContent);
-						} catch (e) {
-							console.error("error while inserting", e);
-						}
+				// Persist user message before streaming AI response
+				let convId = pendingConversationId;
+				if (!convId) {
+					// Create new conversation
+					const title =
+						currentMessages[currentMessages.length - 1]?.content?.slice(
+							0,
+							30,
+						) || "New Chat";
+					convId = await createConversation(title);
+					if (convId) {
+						setPendingConversationId(convId);
+						// Redirect to new conversation URL
+						navigate({
+							to: "/chats/$conversationId",
+							params: { conversationId: convId.toString() },
+						});
 					} else {
-						await updateMessage(assistantMsgId, assistantContent);
+						throw new Error("Failed to create conversation");
 					}
 				}
-			})();
 
-			return stream.toDataStreamResponse();
-		},
-	});
+				// Persist user message
+				const userMsg = currentMessages[currentMessages.length - 1];
+				if (userMsg && userMsg.role === "user") {
+					// Non-blocking insert
+					addMessage(convId, "user", userMsg.content);
+				}
+
+				// Stream AI response and persist as it comes in
+				let assistantMsgId: number | null = null;
+				let assistantContent = "";
+				const stream = streamText({
+					model: google("gemini-2.0-flash"),
+					messages: currentMessages,
+					system: "You are a helpful assistant",
+					maxSteps: 10,
+				});
+
+				// Attach streaming handler for persistence using for-await-of
+				(async () => {
+					for await (const text of stream.textStream) {
+						assistantContent += text;
+						if (!assistantMsgId) {
+							try {
+								assistantMsgId = await addMessage(
+									convId,
+									"assistant",
+									assistantContent,
+								);
+							} catch (e) {
+								console.error("error while inserting", e);
+							}
+						} else {
+							await updateMessage(assistantMsgId, assistantContent);
+						}
+					}
+				})();
+
+				return stream.toDataStreamResponse();
+			},
+		});
+
+	useEffect(() => {
+		setMyMessages([]);
+	}, [conversationId]);
 
 	useEffect(() => {
 		if (storedMessages.length > 0) {
@@ -125,49 +133,43 @@ export default function ChatView({
 		}
 	}, [storedMessages, setMessages]);
 
-	useEffect(() => {
-		console.log("My messages", myMessages);
-	}, [myMessages]);
-
 	return (
 		<div className="flex flex-col flex-1 h-[calc(100vh-48px)]">
-			<div className="flex-1 overflow-y-auto p-4">
-				<ChatMessageList ref={messagesRef}>
-					{myMessages?.map((message) => (
-						<ChatBubble
-							key={message.id}
+			<ChatMessageList ref={messagesRef}>
+				{myMessages?.map((message) => (
+					<ChatBubble
+						key={message.id}
+						variant={message.role === "user" ? "sent" : "received"}
+					>
+						<ChatBubbleMessage
 							variant={message.role === "user" ? "sent" : "received"}
 						>
-							<ChatBubbleMessage
-								variant={message.role === "user" ? "sent" : "received"}
-							>
-								{message.content
-									.split("```")
-									.map((part: string, i: number) => {
-										if (i % 2 === 0) {
-											return (
-												<Markdown key={`${message.id}-${i}`} remarkPlugins={[remarkGfm]}>
-													{part}
-												</Markdown>
-											);
-										}
-										return (
-											<pre className="pt-2" key={`${message.id}-${i}`}>
-												{part}
-											</pre>
-										);
-									})}
-							</ChatBubbleMessage>
-						</ChatBubble>
-					))}
-
-					{status === "submitted" && (
-						<ChatBubble variant="received">
-							<ChatBubbleMessage isLoading />
-						</ChatBubble>
-					)}
-				</ChatMessageList>
-			</div>
+							{message.content.split("```").map((part: string, i: number) => {
+								if (i % 2 === 0) {
+									return (
+										<Markdown
+											key={`${message.id}-${i}`}
+											remarkPlugins={[remarkGfm]}
+										>
+											{part}
+										</Markdown>
+									);
+								}
+								return (
+									<pre className="pt-2" key={`${message.id}-${i}`}>
+										{part}
+									</pre>
+								);
+							})}
+						</ChatBubbleMessage>
+					</ChatBubble>
+				))}
+				{status === "submitted" && (
+					<ChatBubble variant="received">
+						<ChatBubbleMessage isLoading />
+					</ChatBubble>
+				)}
+			</ChatMessageList>
 			<form
 				ref={formRef}
 				className="flex items-center p-4 border-t gap-2"

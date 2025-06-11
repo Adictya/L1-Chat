@@ -4,53 +4,49 @@ import { Button } from "@/components/ui/button";
 import { useAutoScroll } from "@/components/ui/chat/hooks/useAutoScroll";
 
 interface ChatMessageListProps extends React.HTMLAttributes<HTMLDivElement> {
-  smooth?: boolean;
+	smooth?: boolean;
 }
 
 const ChatMessageList = React.forwardRef<HTMLDivElement, ChatMessageListProps>(
-  ({ className, children, smooth = false, ...props }, _ref) => {
-    const {
-      scrollRef,
-      isAtBottom,
-      scrollToBottom,
-      disableAutoScroll,
-    } = useAutoScroll({
-      smooth,
-      content: children,
-    });
+	({ className, children, smooth = false, ...props }, _ref) => {
+		const { scrollRef, isAtBottom, scrollToBottom, disableAutoScroll } =
+			useAutoScroll({
+				content: children,
+			});
 
-    return (
-      <div className="relative w-full flex-1 basis-0">
-        <div
-          className={`flex flex-col w-full h-full p-4 overflow-y-auto ${className}`}
-          ref={scrollRef}
-          onWheel={disableAutoScroll}
-          onTouchMove={disableAutoScroll}
-          style={{
-            flexFlow: 'column',
-            WebkitFlexFlow: 'column',
-          }}
-          {...props}
-        >
-          <div className="flex flex-col gap-6">{children}</div>
-        </div>
+		return (
+			// <div className="relative h-[calc(100%-81px)] w-full">
+			<>
+				<div
+					className={`flex flex-col basis-0 flex-1 p-4 overflow-y-auto ${className}`}
+					ref={scrollRef}
+					onWheel={disableAutoScroll}
+					onTouchMove={disableAutoScroll}
+					style={{
+						flexFlow: "column",
+						WebkitFlexFlow: "column",
+					}}
+					{...props}
+				>
+					<div className="flex flex-col gap-6">{children}</div>
+				</div>
 
-        {!isAtBottom && (
-          <Button
-            onClick={() => {
-              scrollToBottom();
-            }}
-            size="icon"
-            variant="outline"
-            className="absolute bottom-2 left-1/2 transform -translate-x-1/2 inline-flex rounded-full shadow-md"
-            aria-label="Scroll to bottom"
-          >
-            <ArrowDown className="h-4 w-4" />
-          </Button>
-        )}
-      </div>
-    );
-  }
+				{!isAtBottom && (
+					<Button
+						onClick={() => {
+							scrollToBottom();
+						}}
+						size="icon"
+						variant="outline"
+						className="absolute bottom-25 right-10 transform -translate-x-1/2 inline-flex rounded-full shadow-md"
+						aria-label="Scroll to bottom"
+					>
+						<ArrowDown className="h-4 w-4" />
+					</Button>
+				)}
+			</>
+		);
+	},
 );
 
 ChatMessageList.displayName = "ChatMessageList";

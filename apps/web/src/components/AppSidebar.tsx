@@ -8,13 +8,22 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { Link, useRouter } from "@tanstack/react-router";
+import {
+	Link,
+	useLocation,
+	useMatchRoute,
+} from "@tanstack/react-router";
 import { MessageSquare } from "lucide-react";
 import { useSubscribeConversations } from "@/integrations/drizzle-pglite/actions";
 
 export function AppSidebar() {
-	const router = useRouter();
 	const conversations = useSubscribeConversations();
+
+	const matchRoute = useMatchRoute();
+
+	const isPathActive = (itemUrl: string, exactMatch = false): boolean => {
+		return !!matchRoute({ to: itemUrl, fuzzy: !exactMatch });
+	};
 
 	return (
 		<Sidebar>
@@ -24,8 +33,7 @@ export function AppSidebar() {
 					<SidebarGroupContent>
 						<SidebarMenu>
 							{conversations.map((conv) => {
-								const isActive =
-									router.state.location.pathname === `/chats/${conv.id}`;
+								const isActive = isPathActive(`/chats/${conv.id}`);
 								return (
 									<SidebarMenuItem key={conv.id}>
 										<SidebarMenuButton asChild isActive={isActive}>
