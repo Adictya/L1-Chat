@@ -84,9 +84,7 @@ export function useAutoScroll(options: UseAutoScrollOptions = {}) {
 		if (!scrollElement) return;
 
 		const currentHeight = scrollElement.scrollHeight;
-		console.log("current height", scrollElement.scrollHeight);
 		const hasNewContent = currentHeight !== lastContentHeight.current;
-    console.log("has new content", hasNewContent);
 
 		if (hasNewContent) {
 			if (scrollState.autoScrollEnabled) {

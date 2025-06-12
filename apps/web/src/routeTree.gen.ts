@@ -11,11 +11,18 @@
 // Import Routes
 
 import { Route as rootRoute } from './routes/__root'
+import { Route as SettingsImport } from './routes/settings'
 import { Route as IndexImport } from './routes/index'
 import { Route as SettingsProfileImport } from './routes/settings.profile'
 import { Route as ChatsConversationIdImport } from './routes/chats/$conversationId'
 
 // Create/Update Routes
+
+const SettingsRoute = SettingsImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRoute,
+} as any)
 
 const IndexRoute = IndexImport.update({
   id: '/',
@@ -24,9 +31,9 @@ const IndexRoute = IndexImport.update({
 } as any)
 
 const SettingsProfileRoute = SettingsProfileImport.update({
-  id: '/settings/profile',
-  path: '/settings/profile',
-  getParentRoute: () => rootRoute,
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => SettingsRoute,
 } as any)
 
 const ChatsConversationIdRoute = ChatsConversationIdImport.update({
@@ -46,6 +53,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexImport
       parentRoute: typeof rootRoute
     }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsImport
+      parentRoute: typeof rootRoute
+    }
     '/chats/$conversationId': {
       id: '/chats/$conversationId'
       path: '/chats/$conversationId'
@@ -55,24 +69,38 @@ declare module '@tanstack/react-router' {
     }
     '/settings/profile': {
       id: '/settings/profile'
-      path: '/settings/profile'
+      path: '/profile'
       fullPath: '/settings/profile'
       preLoaderRoute: typeof SettingsProfileImport
-      parentRoute: typeof rootRoute
+      parentRoute: typeof SettingsImport
     }
   }
 }
 
 // Create and export the route tree
 
+interface SettingsRouteChildren {
+  SettingsProfileRoute: typeof SettingsProfileRoute
+}
+
+const SettingsRouteChildren: SettingsRouteChildren = {
+  SettingsProfileRoute: SettingsProfileRoute,
+}
+
+const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
+  SettingsRouteChildren,
+)
+
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/settings': typeof SettingsRouteWithChildren
   '/chats/$conversationId': typeof ChatsConversationIdRoute
   '/settings/profile': typeof SettingsProfileRoute
 }
 
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/settings': typeof SettingsRouteWithChildren
   '/chats/$conversationId': typeof ChatsConversationIdRoute
   '/settings/profile': typeof SettingsProfileRoute
 }
@@ -80,29 +108,35 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
+  '/settings': typeof SettingsRouteWithChildren
   '/chats/$conversationId': typeof ChatsConversationIdRoute
   '/settings/profile': typeof SettingsProfileRoute
 }
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/chats/$conversationId' | '/settings/profile'
+  fullPaths: '/' | '/settings' | '/chats/$conversationId' | '/settings/profile'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/chats/$conversationId' | '/settings/profile'
-  id: '__root__' | '/' | '/chats/$conversationId' | '/settings/profile'
+  to: '/' | '/settings' | '/chats/$conversationId' | '/settings/profile'
+  id:
+    | '__root__'
+    | '/'
+    | '/settings'
+    | '/chats/$conversationId'
+    | '/settings/profile'
   fileRoutesById: FileRoutesById
 }
 
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  SettingsRoute: typeof SettingsRouteWithChildren
   ChatsConversationIdRoute: typeof ChatsConversationIdRoute
-  SettingsProfileRoute: typeof SettingsProfileRoute
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  SettingsRoute: SettingsRouteWithChildren,
   ChatsConversationIdRoute: ChatsConversationIdRoute,
-  SettingsProfileRoute: SettingsProfileRoute,
 }
 
 export const routeTree = rootRoute
@@ -116,18 +150,25 @@ export const routeTree = rootRoute
       "filePath": "__root.tsx",
       "children": [
         "/",
-        "/chats/$conversationId",
-        "/settings/profile"
+        "/settings",
+        "/chats/$conversationId"
       ]
     },
     "/": {
       "filePath": "index.tsx"
     },
+    "/settings": {
+      "filePath": "settings.tsx",
+      "children": [
+        "/settings/profile"
+      ]
+    },
     "/chats/$conversationId": {
       "filePath": "chats/$conversationId.tsx"
     },
     "/settings/profile": {
-      "filePath": "settings.profile.tsx"
+      "filePath": "settings.profile.tsx",
+      "parent": "/settings"
     }
   }
 }

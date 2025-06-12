@@ -4,24 +4,37 @@ import { ChatBubble, ChatBubbleMessage } from "./ui/chat/chat-bubble";
 import { Button } from "./ui/button";
 import { Send } from "lucide-react";
 import { ChatInput } from "./ui/chat/chat-input";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import { useChat } from "@ai-sdk/react";
 import type { ChatMessage } from "l1-db";
-import { Route } from "@/routes";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { streamText, type UIMessage } from "ai";
+import { streamText, type Provider, type UIMessage } from "ai";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useNavigate } from "@tanstack/react-router";
-import type React from "react";
+import React from "react";
 import {
 	createConversation,
 	addMessage,
 	updateMessage,
 } from "@/integrations/drizzle-pglite/actions";
+import { getSettings } from "@/integrations/tanstack-store/settings-store";
+import { ModelsInfo, ProvidersInfo, type ModelsEnum, type ProvidersEnum, PerAvailableModelProvidersList } from "@/integrations/tanstack-store/models-store";
 
-const google = createGoogleGenerativeAI({
-	apiKey: "AIzaSyDPUk7hKxcASKxD9-phqeXb0lHaKmqExxg",
-});
+
+const getProvider = (providerId: ProvidersEnum) => {
+	const provider = getSettings()[providerId];
+	if (!provider) {
+		throw new Error(`Provider ${providerId} not found`);
+	}
+	return provider.provider as Provider;
+};
 
 interface ChatViewProps {
 	conversationId?: number;
@@ -35,6 +48,10 @@ export default function ChatView({
 	const messagesRef = useRef<HTMLDivElement>(null);
 	const formRef = useRef<HTMLFormElement>(null);
 	const navigate = useNavigate();
+	const [selectedModel, setSelectedModelState] = useState<{ model: ModelsEnum, provider: ProvidersEnum }>({ 
+		model: ModelsInfo.Gemini_2_5_Flash.id,
+		provider: ProvidersInfo.google.id,
+	});
 
 	const [pendingConversationId, setPendingConversationId] = useState<
 		number | undefined
@@ -82,10 +99,14 @@ export default function ChatView({
 				// Stream AI response and persist as it comes in
 				let assistantMsgId: number | null = null;
 				let assistantContent = "";
+				const providerConfig = ModelsInfo[selectedModel.model].providers[selectedModel.provider];
+				if (!providerConfig) {
+					throw new Error(`No provider config found for model ${selectedModel.model} and provider ${selectedModel.provider}`);
+				}
 				const stream = streamText({
-					model: google("gemini-2.0-flash"),
+					model: getProvider(selectedModel.provider).languageModel(providerConfig.model),
 					messages: currentMessages,
-					system: "You are a helpful assistant",
+					system: "You are a helpful assistant", 
 					maxSteps: 10,
 				});
 
@@ -133,6 +154,10 @@ export default function ChatView({
 		}
 	}, [storedMessages, setMessages]);
 
+	const handleModelChange = (modelId: ModelsEnum, providerId: ProvidersEnum) => {
+		setSelectedModelState({ model: modelId, provider: providerId });
+	};
+
 	return (
 		<div className="flex flex-col flex-1 h-[calc(100vh-48px)]">
 			<ChatMessageList ref={messagesRef}>
@@ -175,6 +200,29 @@ export default function ChatView({
 				className="flex items-center p-4 border-t gap-2"
 				onSubmit={handleSubmit}
 			>
+				<DropdownMenu>
+					<DropdownMenuTrigger asChild>
+						<Button variant="outline" className="w-[180px]">
+							{ModelsInfo[selectedModel.model].name}
+						</Button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent>
+						{PerAvailableModelProvidersList.map(([providerId, models]) => (
+							<React.Fragment key={providerId}>
+								<DropdownMenuLabel>{ProvidersInfo[providerId as ProvidersEnum].name}</DropdownMenuLabel>
+								{models.map((model) => (
+									<DropdownMenuItem
+										key={model.id}
+										onClick={() => handleModelChange(model.id, providerId as ProvidersEnum)}
+									>
+										{model.name}
+									</DropdownMenuItem>
+								))}
+								<DropdownMenuSeparator />
+							</React.Fragment>
+						))}
+					</DropdownMenuContent>
+				</DropdownMenu>
 				<ChatInput
 					value={input}
 					onChange={handleInputChange}
