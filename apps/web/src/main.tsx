@@ -53,5 +53,5 @@ if (rootElement && !rootElement.innerHTML) {
 // or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
 reportWebVitals();
 scan({
-  enabled: true,
+  enabled: false,
 });

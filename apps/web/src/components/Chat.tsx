@@ -25,8 +25,17 @@ import {
 	updateMessage,
 } from "@/integrations/drizzle-pglite/actions";
 import { getSettings } from "@/integrations/tanstack-store/settings-store";
-import { ModelsInfo, ProvidersInfo, type ModelsEnum, type ProvidersEnum, PerAvailableModelProvidersList } from "@/integrations/tanstack-store/models-store";
+import {
+	ModelsInfo,
+	ProvidersInfo,
+	type ModelsEnum,
+	type ProvidersEnum,
+	PerAvailableModelProvidersList,
+} from "@/integrations/tanstack-store/models-store";
+import ShikiHighlighter from "react-shiki";
+import { CodeHighlight } from "./CodeHighlighter";
 
+const DEBUG_SPEED = false;
 
 const getProvider = (providerId: ProvidersEnum) => {
 	const provider = getSettings()[providerId];
@@ -48,7 +57,10 @@ export default function ChatView({
 	const messagesRef = useRef<HTMLDivElement>(null);
 	const formRef = useRef<HTMLFormElement>(null);
 	const navigate = useNavigate();
-	const [selectedModel, setSelectedModelState] = useState<{ model: ModelsEnum, provider: ProvidersEnum }>({ 
+	const [selectedModel, setSelectedModelState] = useState<{
+		model: ModelsEnum;
+		provider: ProvidersEnum;
+	}>({
 		model: ModelsInfo.Gemini_2_5_Flash.id,
 		provider: ProvidersInfo.google.id,
 	});
@@ -59,80 +71,87 @@ export default function ChatView({
 
 	const [myMessages, setMyMessages] = useState<UIMessage[]>([]);
 
-	const { status, setMessages, input, handleInputChange, handleSubmit } =
-		useChat({
-			streamProtocol: "data",
-			fetch: async (_url, options) => {
-				const { messages: currentMessages } = JSON.parse(
-					options?.body as string,
+	const {
+		status,
+		messages,
+		setMessages,
+		input,
+		handleInputChange,
+		handleSubmit,
+	} = useChat({
+		streamProtocol: "data",
+		fetch: async (_url, options) => {
+			const { messages: currentMessages } = JSON.parse(options?.body as string);
+
+			// Persist user message before streaming AI response
+			let convId = pendingConversationId;
+			if (!convId) {
+				// Create new conversation
+				const title =
+					currentMessages[currentMessages.length - 1]?.content?.slice(0, 30) ||
+					"New Chat";
+				convId = await createConversation(title);
+				if (convId) {
+					setPendingConversationId(convId);
+					// Redirect to new conversation URL
+					navigate({
+						to: "/chats/$conversationId",
+						params: { conversationId: convId.toString() },
+					});
+				} else {
+					throw new Error("Failed to create conversation");
+				}
+			}
+
+			// Persist user message
+			const userMsg = currentMessages[currentMessages.length - 1];
+			if (userMsg && userMsg.role === "user") {
+				// Non-blocking insert
+				addMessage(convId, "user", userMsg.content);
+			}
+
+			// Stream AI response and persist as it comes in
+			let assistantMsgId: number | null = null;
+			let assistantContent = "";
+			const providerConfig =
+				ModelsInfo[selectedModel.model].providers[selectedModel.provider];
+			if (!providerConfig) {
+				throw new Error(
+					`No provider config found for model ${selectedModel.model} and provider ${selectedModel.provider}`,
 				);
+			}
+			const stream = streamText({
+				model: getProvider(selectedModel.provider).languageModel(
+					providerConfig.model,
+				),
+				messages: currentMessages,
+				system: "You are a helpful assistant",
+				maxSteps: 10,
+			});
 
-				// Persist user message before streaming AI response
-				let convId = pendingConversationId;
-				if (!convId) {
-					// Create new conversation
-					const title =
-						currentMessages[currentMessages.length - 1]?.content?.slice(
-							0,
-							30,
-						) || "New Chat";
-					convId = await createConversation(title);
-					if (convId) {
-						setPendingConversationId(convId);
-						// Redirect to new conversation URL
-						navigate({
-							to: "/chats/$conversationId",
-							params: { conversationId: convId.toString() },
-						});
-					} else {
-						throw new Error("Failed to create conversation");
-					}
-				}
-
-				// Persist user message
-				const userMsg = currentMessages[currentMessages.length - 1];
-				if (userMsg && userMsg.role === "user") {
-					// Non-blocking insert
-					addMessage(convId, "user", userMsg.content);
-				}
-
-				// Stream AI response and persist as it comes in
-				let assistantMsgId: number | null = null;
-				let assistantContent = "";
-				const providerConfig = ModelsInfo[selectedModel.model].providers[selectedModel.provider];
-				if (!providerConfig) {
-					throw new Error(`No provider config found for model ${selectedModel.model} and provider ${selectedModel.provider}`);
-				}
-				const stream = streamText({
-					model: getProvider(selectedModel.provider).languageModel(providerConfig.model),
-					messages: currentMessages,
-					system: "You are a helpful assistant", 
-					maxSteps: 10,
-				});
-
-				// Attach streaming handler for persistence using for-await-of
-				(async () => {
-					for await (const text of stream.textStream) {
-						assistantContent += text;
-						if (!assistantMsgId) {
-							try {
-								assistantMsgId = await addMessage(
-									convId,
-									"assistant",
-									assistantContent,
-								);
-							} catch (e) {
-								console.error("error while inserting", e);
-							}
-						} else {
-							await updateMessage(assistantMsgId, assistantContent);
+			// Attach streaming handler for persistence using for-await-of
+			(async () => {
+				for await (const text of stream.textStream) {
+					assistantContent += text;
+					if (!assistantMsgId) {
+						try {
+							assistantMsgId = await addMessage(
+								convId,
+								"assistant",
+								assistantContent,
+							);
+						} catch (e) {
+							console.error("error while inserting", e);
 						}
+					} else {
+						await updateMessage(assistantMsgId, assistantContent);
 					}
-				})();
+				}
+			})();
 
-				return stream.toDataStreamResponse();
-			},
-		});
+			return stream.toDataStreamResponse();
+		},
+	});
 
 	useEffect(() => {
 		setMyMessages([]);
@@ -154,41 +173,58 @@ export default function ChatView({
 		}
 	}, [storedMessages, setMessages]);
 
-	const handleModelChange = (modelId: ModelsEnum, providerId: ProvidersEnum) => {
+	const handleModelChange = (
+		modelId: ModelsEnum,
+		providerId: ProvidersEnum,
+	) => {
 		setSelectedModelState({ model: modelId, provider: providerId });
 	};
 
 	return (
-		<div className="flex flex-col flex-1 h-[calc(100vh-48px)]">
+		<div className="flex flex-col flex-1 h-[calc(100vh-48px)] w-full">
 			<ChatMessageList ref={messagesRef}>
-				{myMessages?.map((message) => (
-					<ChatBubble
-						key={message.id}
-						variant={message.role === "user" ? "sent" : "received"}
-					>
-						<ChatBubbleMessage
+				{myMessages?.map((message, index) =>
+					message.role === "user" ? (
+						<ChatBubble
+							key={message.id}
 							variant={message.role === "user" ? "sent" : "received"}
 						>
-							{message.content.split("```").map((part: string, i: number) => {
-								if (i % 2 === 0) {
-									return (
-										<Markdown
-											key={`${message.id}-${i}`}
-											remarkPlugins={[remarkGfm]}
-										>
-											{part}
-										</Markdown>
-									);
-								}
-								return (
-									<pre className="pt-2" key={`${message.id}-${i}`}>
-										{part}
-									</pre>
-								);
-							})}
-						</ChatBubbleMessage>
-					</ChatBubble>
-				))}
+							<ChatBubbleMessage
+								variant={message.role === "user" ? "sent" : "received"}
+							>
+								{message.content}
+							</ChatBubbleMessage>
+						</ChatBubble>
+					) : DEBUG_SPEED && index === myMessages.length - 1 ? null : (
+						<div className="prose prose-pink max-w-none dark:prose-invert prose-pre:m-0 prose-pre:bg-transparent prose-pre:p-0 ">
+							<Markdown
+								remarkPlugins={[remarkGfm]}
+								components={{
+									code: CodeHighlight,
+								}}
+							>
+								{message.content}
+							</Markdown>
+						</div>
+					),
+				)}
+				{DEBUG_SPEED && (
+					<div className="prose prose-pink max-w-none dark:prose-invert prose-pre:m-0 prose-pre:bg-transparent prose-pre:p-0 ">
+						<Markdown
+							remarkPlugins={[remarkGfm]}
+							components={{
+								code: CodeHighlight,
+							}}
+						>
+							{messages
+								.filter((msg) => msg.role === "assistant")
+								.at(-1)
+								?.parts.map((e) => (e.type === "text" ? e.text : ""))
+								.join("")}
+						</Markdown>
+					</div>
+				)}
+
 				{status === "submitted" && (
 					<ChatBubble variant="received">
 						<ChatBubbleMessage isLoading />
@@ -209,11 +245,15 @@ export default function ChatView({
 					<DropdownMenuContent>
 						{PerAvailableModelProvidersList.map(([providerId, models]) => (
 							<React.Fragment key={providerId}>
-								<DropdownMenuLabel>{ProvidersInfo[providerId as ProvidersEnum].name}</DropdownMenuLabel>
+								<DropdownMenuLabel>
+									{ProvidersInfo[providerId as ProvidersEnum].name}
+								</DropdownMenuLabel>
 								{models.map((model) => (
 									<DropdownMenuItem
 										key={model.id}
-										onClick={() => handleModelChange(model.id, providerId as ProvidersEnum)}
+										onClick={() =>
+											handleModelChange(model.id, providerId as ProvidersEnum)
+										}
 									>
 										{model.name}
 									</DropdownMenuItem>
