@@ -39,7 +39,7 @@ export async function createConversation(title: string) {
 
 export async function addMessage(
 	conversationId: number,
-	role: "user" | "assistant",
+	role: "user" | "assistant" | "system",
 	content: string,
 ) {
 	const result = await pg.query<{ id: number }>(

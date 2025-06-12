@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChatMessageList } from "./ui/chat/chat-message-list";
 import { ChatBubble, ChatBubbleMessage } from "./ui/chat/chat-bubble";
 import { Button } from "./ui/button";
-import { Send } from "lucide-react";
+import { Send, Square } from "lucide-react";
 import { ChatInput } from "./ui/chat/chat-input";
 import {
 	DropdownMenu,
@@ -14,7 +14,13 @@ import {
 } from "./ui/dropdown-menu";
 import { useChat } from "@ai-sdk/react";
 import type { ChatMessage } from "l1-db";
-import { streamText, type Provider, type UIMessage } from "ai";
+import {
+	smoothStream,
+	streamText,
+	type CoreMessage,
+	type Provider,
+	type UIMessage,
+} from "ai";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useNavigate } from "@tanstack/react-router";
@@ -32,10 +38,20 @@ import {
 	type ProvidersEnum,
 	PerAvailableModelProvidersList,
 } from "@/integrations/tanstack-store/models-store";
-import ShikiHighlighter from "react-shiki";
 import { CodeHighlight } from "./CodeHighlighter";
+import { useStreamText } from "@/hooks/use-stream-text";
 
-const DEBUG_SPEED = false;
+const getPrompt = () => {
+	return `
+You are L1 Chat, an AI assistant powered by the Gemini 2.0 Flash model. Your role is to assist and engage in conversation while being helpful, respectful, and engaging.
+
+If you are specifically asked about the model you are using, you may mention that you use the Gemini 2.5 Flash model. If you are not asked specifically about the model you are using, you do not need to mention it.
+The current date and time including timezone is ${new Date().toISOString()}.
+
+Ensure code is properly formatted using Prettier with a print width of 80 characters
+Present code in Markdown code blocks with the correct language extension indicated
+  `;
+};
 
 const getProvider = (providerId: ProvidersEnum) => {
 	const provider = getSettings()[providerId];
@@ -50,12 +66,15 @@ interface ChatViewProps {
 	storedMessages: ChatMessage[];
 }
 
+const bc = new BroadcastChannel("ai-channel");
+
 export default function ChatView({
 	conversationId,
 	storedMessages,
 }: ChatViewProps) {
-	const messagesRef = useRef<HTMLDivElement>(null);
+	const messageRef = useRef<HTMLTextAreaElement>(null);
 	const formRef = useRef<HTMLFormElement>(null);
+	const abortControllerRef = useRef<AbortController | null>(null);
 	const navigate = useNavigate();
 	const [selectedModel, setSelectedModelState] = useState<{
 		model: ModelsEnum;
@@ -65,54 +84,36 @@ export default function ChatView({
 		provider: ProvidersInfo.google.id,
 	});
 
-	const [pendingConversationId, setPendingConversationId] = useState<
-		number | undefined
-	>(conversationId);
+	const { status, stream, stop } = useStreamText();
 
-	const [myMessages, setMyMessages] = useState<UIMessage[]>([]);
+	const onSubmit = async (e: Event | undefined) => {
+		e?.preventDefault();
 
-	const {
-		status,
-		messages,
-		setMessages,
-		input,
-		handleInputChange,
-		handleSubmit,
-	} = useChat({
-		streamProtocol: "data",
-		fetch: async (_url, options) => {
-			const { messages: currentMessages } = JSON.parse(options?.body as string);
+		const input = messageRef.current?.value;
+		if (!input || !messageRef.current) throw new Error("Empty message");
+		messageRef.current.value = "";
+		const title = storedMessages.at(-1)?.content?.slice(0, 30) || "New Chat";
+		const convId = conversationId || (await createConversation(title));
+		await addMessage(convId, "user", input);
+		if (!conversationId) {
+			navigate({
+				to: "/chats/$conversationId",
+				params: { conversationId: convId.toString() },
+			});
+		}
+		try {
+			let content = "";
+			const mappedMessages: CoreMessage[] = storedMessages.map((msg) => ({
+				role: msg.role === "user" ? "user" : "assistant",
+				content: msg.content,
+			}));
+			mappedMessages.push({
+				role: "user",
+				content: input,
+			});
+			const msgId = await addMessage(convId, "assistant", content);
 
-			// Persist user message before streaming AI response
-			let convId = pendingConversationId;
-			if (!convId) {
-				// Create new conversation
-				const title =
-					currentMessages[currentMessages.length - 1]?.content?.slice(0, 30) ||
-					"New Chat";
-				convId = await createConversation(title);
-				if (convId) {
-					setPendingConversationId(convId);
-					// Redirect to new conversation URL
-					navigate({
-						to: "/chats/$conversationId",
-						params: { conversationId: convId.toString() },
-					});
-				} else {
-					throw new Error("Failed to create conversation");
-				}
-			}
-
-			// Persist user message
-			const userMsg = currentMessages[currentMessages.length - 1];
-			if (userMsg && userMsg.role === "user") {
-				// Non-blocking insert
-				addMessage(convId, "user", userMsg.content);
-			}
-
-			// Stream AI response and persist as it comes in
-			let assistantMsgId: number | null = null;
-			let assistantContent = "";
+			console.log("addedMessage", msgId, mappedMessages);
 			const providerConfig =
 				ModelsInfo[selectedModel.model].providers[selectedModel.provider];
 			if (!providerConfig) {
@@ -120,58 +121,27 @@ export default function ChatView({
 					`No provider config found for model ${selectedModel.model} and provider ${selectedModel.provider}`,
 				);
 			}
-			const stream = streamText({
+			await stream({
 				model: getProvider(selectedModel.provider).languageModel(
 					providerConfig.model,
 				),
-				messages: currentMessages,
-				system: "You are a helpful assistant",
-				maxSteps: 10,
-			});
-
-			// Attach streaming handler for persistence using for-await-of
-			(async () => {
-				for await (const text of stream.textStream) {
-					assistantContent += text;
-					if (!assistantMsgId) {
-						try {
-							assistantMsgId = await addMessage(
-								convId,
-								"assistant",
-								assistantContent,
-							);
-						} catch (e) {
-							console.error("error while inserting", e);
-						}
-					} else {
-						await updateMessage(assistantMsgId, assistantContent);
+				// prompt: getPrompt(),
+				messages: mappedMessages.filter((msg) => msg.content !== ""),
+				system: getPrompt(),
+				maxSteps: 2,
+				onChunk(chunk) {
+					if (chunk.type === "text-delta") {
+						console.log("Recieved chunk");
+						content += chunk.textDelta;
+						updateMessage(msgId, content);
+					} else if (chunk.type === "reasoning") {
 					}
-				}
-			})();
-
-			return stream.toDataStreamResponse();
-		},
-	});
-
-	useEffect(() => {
-		setMyMessages([]);
-	}, [conversationId]);
-
-	useEffect(() => {
-		if (storedMessages.length > 0) {
-			const temp = storedMessages.map(
-				(row) =>
-					({
-						id: `${row.id}`,
-						role: row.role === "user" ? "user" : "assistant",
-						content: row.content,
-						createdAt: new Date(row.createdAt),
-					}) as UIMessage,
-			);
-			setMessages(temp);
-			setMyMessages(temp);
+				},
+			});
+		} catch (e) {
+			console.log("Worker error", e);
 		}
-	}, [storedMessages, setMessages]);
+	};
 
 	const handleModelChange = (
 		modelId: ModelsEnum,
@@ -180,10 +150,18 @@ export default function ChatView({
 		setSelectedModelState({ model: modelId, provider: providerId });
 	};
 
+	const handleStop = () => {
+		console.log("Cancelling");
+		if (abortControllerRef.current) {
+			abortControllerRef.current.abort();
+			abortControllerRef.current = null;
+		}
+	};
+
 	return (
 		<div className="flex flex-col flex-1 h-[calc(100vh-48px)] w-full">
-			<ChatMessageList ref={messagesRef}>
-				{myMessages?.map((message, index) =>
+			<ChatMessageList>
+				{storedMessages?.map((message) =>
 					message.role === "user" ? (
 						<ChatBubble
 							key={message.id}
@@ -195,8 +173,11 @@ export default function ChatView({
 								{message.content}
 							</ChatBubbleMessage>
 						</ChatBubble>
-					) : DEBUG_SPEED && index === myMessages.length - 1 ? null : (
-						<div className="prose prose-pink max-w-none dark:prose-invert prose-pre:m-0 prose-pre:bg-transparent prose-pre:p-0 ">
+					) : (
+						<div
+							key={message.id}
+							className="prose prose-pink max-w-none dark:prose-invert prose-pre:m-0 prose-pre:bg-transparent prose-pre:p-0 "
+						>
 							<Markdown
 								remarkPlugins={[remarkGfm]}
 								components={{
@@ -208,23 +189,6 @@ export default function ChatView({
 						</div>
 					),
 				)}
-				{DEBUG_SPEED && (
-					<div className="prose prose-pink max-w-none dark:prose-invert prose-pre:m-0 prose-pre:bg-transparent prose-pre:p-0 ">
-						<Markdown
-							remarkPlugins={[remarkGfm]}
-							components={{
-								code: CodeHighlight,
-							}}
-						>
-							{messages
-								.filter((msg) => msg.role === "assistant")
-								.at(-1)
-								?.parts.map((e) => (e.type === "text" ? e.text : ""))
-								.join("")}
-						</Markdown>
-					</div>
-				)}
-
 				{status === "submitted" && (
 					<ChatBubble variant="received">
 						<ChatBubbleMessage isLoading />
@@ -233,8 +197,8 @@ export default function ChatView({
 			</ChatMessageList>
 			<form
 				ref={formRef}
+				onSubmit={onSubmit}
 				className="flex items-center p-4 border-t gap-2"
-				onSubmit={handleSubmit}
 			>
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
@@ -264,29 +228,29 @@ export default function ChatView({
 					</DropdownMenuContent>
 				</DropdownMenu>
 				<ChatInput
-					value={input}
-					onChange={handleInputChange}
+					ref={messageRef}
 					onKeyDown={(e) => {
 						if (e.key === "Enter" && !e.shiftKey) {
 							e.preventDefault();
-							if (formRef.current)
-								handleSubmit(
-									new Event("submit", {
-										cancelable: true,
-										bubbles: true,
-									}) as unknown as React.FormEvent<HTMLFormElement>,
-								);
+							if (formRef.current) onSubmit(undefined);
 						}
 					}}
 					className="flex-1 min-h-12 bg-background"
 				/>
-				<Button
-					type="submit"
-					size="icon"
-					disabled={(status !== "ready" && status !== "error") || !input}
-				>
-					<Send className="size-4" />
-				</Button>
+				{status}
+				{status === "generating" || status === "reasoning" ? (
+					<Button type="button" size="icon" onClick={handleStop}>
+						<Square className="size-4" />
+					</Button>
+				) : (
+					<Button
+						type="submit"
+						size="icon"
+						disabled={status !== "ready" && status !== "error"}
+					>
+						<Send className="size-4" />
+					</Button>
+				)}
 			</form>
 		</div>
 	);
