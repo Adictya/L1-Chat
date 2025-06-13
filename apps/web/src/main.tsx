@@ -1,4 +1,4 @@
-import { scan } from "react-scan"; // must be imported before React and React DOM
+// import { scan } from "react-scan"; // must be imported before React and React DOM
 import { StrictMode } from "react";
 import ReactDOM from "react-dom/client";
 import { RouterProvider, createRouter } from "@tanstack/react-router";
@@ -12,6 +12,7 @@ import { routeTree } from "./routeTree.gen";
 import "./styles.css";
 import reportWebVitals from "./reportWebVitals.ts";
 import pg from "./integrations/drizzle-pglite/pglite.ts";
+import { PopulateConversations } from "./integrations/tanstack-store/chats-store.ts";
 
 // Create a new router instance
 const router = createRouter({
@@ -25,6 +26,8 @@ const router = createRouter({
 	defaultStructuralSharing: true,
 	defaultPreloadStaleTime: 0,
 });
+
+await PopulateConversations(pg);
 
 // Register the router instance for type safety
 declare module "@tanstack/react-router" {
@@ -52,6 +55,6 @@ if (rootElement && !rootElement.innerHTML) {
 // to log results (for example: reportWebVitals(console.log))
 // or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
 reportWebVitals();
-scan({
-  enabled: true,
-});
+// scan({
+//   enabled: true,
+// });

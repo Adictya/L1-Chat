@@ -1,1 +1,0 @@
-ALTER TABLE "chat_message" ALTER COLUMN "sources" SET DEFAULT '{}'::jsonb;

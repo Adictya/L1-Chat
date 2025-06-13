@@ -22,50 +22,75 @@ export const account = pgTable(
 
 export type Account = typeof account.$inferSelect;
 
+export type Conversation = {
+	id: string;
+	title: string;
+	branch: boolean;
+	generating: boolean;
+	meta: {
+		tokens: number;
+		activeTokens: number;
+	};
+	createdAt: string;
+	updatedAt: string;
+};
+
 export const conversation = pgTable("conversation", {
-	id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-	title: varchar("title", { length: 255 }).notNull(),
+	id: varchar("id", { length: 255 }).primaryKey(),
+	data: jsonb("data").$type<Conversation>().notNull(),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export type Conversation = typeof conversation.$inferSelect;
-
-export const chatMessage = pgTable("chat_message", {
-	id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-	conversationId: integer("conversation_id")
-		.notNull()
-		.references(() => conversation.id, { onDelete: "cascade" }),
-	role: varchar("role", { length: 255 }).notNull(),
-	content: text("content").notNull(),
-	meta: jsonb("meta")
-		.$type<{
-			model?: string;
-			provider?: string;
-			reasoning?: string;
-			sources?: Source[];
-		}>()
-		.notNull()
-		.default({}),
-	createdAt: timestamp("created_at").defaultNow().notNull(),
-	updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+export type ConversationEntry = typeof conversation.$inferSelect;
 
 export type Source = {
 	id: string;
 	sourceType: string;
-	title: string;
+	title?: string;
 	url: string;
 };
 
-export type ChatMessage = typeof chatMessage.$inferSelect;
+const ChatMessageRoles = {
+	User: "user",
+	Assistant: "assistant",
+} as const;
 
-export const chatInput = pgTable("chat_input", {
-	id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-	conversationId: integer("conversation_id")
+export type ChatMessageRole =
+	(typeof ChatMessageRoles)[keyof typeof ChatMessageRoles];
+
+export type ChatMessage = {
+	id: string;
+	conversationId: string;
+	message: string;
+	disabled?: boolean;
+	createdAt: string;
+	updatedAt: string;
+	meta_tokens: number;
+	role: "assistant" | "user";
+	meta_model?: string;
+	meta_provider?: string;
+	reasoning?: string;
+	sources?: Source[];
+	parts?: string[];
+	status?:
+		| "submitted"
+		| "reasoning"
+		| "generating"
+		| "done"
+		| "errored"
+		| "stopped";
+	error?: string;
+};
+
+export const chatMessageTable = pgTable("chat_message", {
+	id: varchar("id", { length: 255 }).primaryKey(),
+	conversationId: varchar("conversation_id", { length: 255 })
 		.notNull()
 		.references(() => conversation.id, { onDelete: "cascade" }),
-	input: text("input").notNull(),
+	data: jsonb("data").$type<ChatMessage>().notNull(),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+export type MessageEntry = typeof chatMessageTable.$inferSelect;

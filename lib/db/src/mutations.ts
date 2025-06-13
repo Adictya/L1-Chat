@@ -1,5 +1,5 @@
 import type { PGlite } from "@electric-sql/pglite";
-import { type ChatMessage } from "./schema";
+import { type MessageEntry } from "./schema";
 
 export async function createConversation(pg: PGlite, title: string) {
 	const result = await pg.query<{ id: number }>(
@@ -34,7 +34,7 @@ export async function updateMessage(
 }
 
 export async function getMessages(pg: PGlite, conversationId: number) {
-	return await pg.query<ChatMessage>(
+	return await pg.query<MessageEntry>(
 		"select * from chat_message WHERE conversation_id = $1",
 		[conversationId],
 	);

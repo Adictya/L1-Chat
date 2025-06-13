@@ -5,36 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1749518781084,
-      "tag": "0000_gray_scorpion",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1749519176956,
-      "tag": "0001_young_karnak",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1749785180353,
-      "tag": "0002_hard_joystick",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1749786870621,
-      "tag": "0003_public_rhodey",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1749788648002,
-      "tag": "0004_huge_smiling_tiger",
+      "when": 1749845370290,
+      "tag": "0000_awesome_whistler",
       "breakpoints": true
     }
   ]

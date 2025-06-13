@@ -1,6 +1,6 @@
 import { eq, asc } from "drizzle-orm";
 import db, {
-	chatMessage,
+	chatMessageTable,
 	conversation,
 	type ChatMessage,
 	type Conversation,
@@ -20,9 +20,9 @@ export function useSubscribeConversationMessages(conversationId: number) {
 	const { data: msgs } = useSubscription<ChatMessage>(
 		db
 			.select()
-			.from(chatMessage)
-			.where(eq(chatMessage.conversationId, conversationId))
-			.orderBy(asc(chatMessage.createdAt))
+			.from(chatMessageTable)
+			.where(eq(chatMessageTable.conversationId, conversationId))
+			.orderBy(asc(chatMessageTable.createdAt))
 			.toSQL(),
 	);
 

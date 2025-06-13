@@ -2,14 +2,14 @@ import { createStore } from "zustand/vanilla";
 import { create, useStore } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
-interface Conversation {
+interface ConversationOld {
   id: string;
   title: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
-export interface ChatMessage {
+export interface ChatMessageOld {
   id: string;
   conversationId: string;
   role: string;
@@ -18,33 +18,33 @@ export interface ChatMessage {
   updatedAt: Date;
 }
 
-interface ChatStore {
+interface ChatStoreOld {
   // Conversations state
-  conversations: Conversation[];
-  setConversations: (conversations: Conversation[]) => void;
+  conversations: ConversationOld[];
+  setConversations: (conversations: ConversationOld[]) => void;
   addConversation: (title: string) => string;
-  updateConversation: (id: string, updates: Partial<Conversation>) => void;
+  updateConversation: (id: string, updates: Partial<ConversationOld>) => void;
   deleteConversation: (id: string) => void;
 
   // Chat messages state
-  messages: ChatMessage[];
-  setMessages: (messages: ChatMessage[]) => void;
-  addMessage: (messageInfo: Pick<ChatMessage, "role" | "content" | "conversationId">) => string;
-  updateMessage: (id: string, updates: Partial<ChatMessage>) => void;
+  messages: ChatMessageOld[];
+  setMessages: (messages: ChatMessageOld[]) => void;
+  addMessage: (messageInfo: Pick<ChatMessageOld, "role" | "content" | "conversationId">) => string;
+  updateMessage: (id: string, updates: Partial<ChatMessageOld>) => void;
   deleteMessage: (id: string) => void;
-  getMessagesByConversationId: (conversationId: string) => ChatMessage[];
+  getMessagesByConversationId: (conversationId: string) => ChatMessageOld[];
 }
 
 const generateId = () => {
   return crypto.randomUUID();
 };
 
-export const useChatStore = create<ChatStore>()(
+export const useChatStoreOld = create<ChatStoreOld>()(
   persist(
     (set, get) => ({
       // Conversations
       conversations: [],
-      setConversations: (conversations: Conversation[]) =>
+      setConversations: (conversations: ConversationOld[]) =>
         set({ conversations }),
       addConversation: (title: string) => {
         const id = generateId();
@@ -56,7 +56,7 @@ export const useChatStore = create<ChatStore>()(
         }));
         return id;
       },
-      updateConversation: (id: string, updates: Partial<Conversation>) =>
+      updateConversation: (id: string, updates: Partial<ConversationOld>) =>
         set((state) => ({
           conversations: state.conversations.map((conv) =>
             conv.id === id
@@ -72,7 +72,7 @@ export const useChatStore = create<ChatStore>()(
       // Chat messages
       messages: [],
       setMessages: (messages) => set({ messages }),
-      addMessage: (messageInfo: Pick<ChatMessage, "role" | "content" | "conversationId">) =>
+      addMessage: (messageInfo: Pick<ChatMessageOld, "role" | "content" | "conversationId">) =>
         {
           const id = generateId();
           set((state) => ({

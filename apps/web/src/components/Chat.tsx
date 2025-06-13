@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { ChatMessageList } from "./ui/chat/chat-message-list";
 import { ChatBubble, ChatBubbleMessage } from "./ui/chat/chat-bubble";
 import { Button } from "./ui/button";
@@ -12,24 +12,10 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { useChat } from "@ai-sdk/react";
-import type { ChatMessage, Source } from "l1-db";
-import {
-	smoothStream,
-	streamText,
-	type CoreMessage,
-	type Provider,
-	type UIMessage,
-} from "ai";
-import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import type { Source } from "l1-db";
+import type { CoreMessage, Provider } from "ai";
 import { useNavigate } from "@tanstack/react-router";
 import React from "react";
-import {
-	createConversation,
-	addMessage,
-	updateMessage,
-} from "@/integrations/drizzle-pglite/actions";
 import settingsStore, {
 	getSettings,
 	toggleSearch,
@@ -42,16 +28,17 @@ import {
 	PerAvailableModelProvidersList,
 	Providers,
 } from "@/integrations/tanstack-store/models-store";
-import { CodeHighlight } from "./CodeHighlighter";
 import { useStreamText } from "@/hooks/use-stream-text";
-import { useStore } from "@tanstack/react-store";
-import { cn } from "@/lib/utils";
+import { Store, useStore } from "@tanstack/react-store";
 import {
-	Accordion,
-	AccordionContent,
-	AccordionItem,
-	AccordionTrigger,
-} from "./ui/accordion";
+	useSubscribeConversationMessages,
+	createConversation,
+	addMessage,
+	updateMessage,
+	updateMessageStream,
+	updateMessageStreamWithSources,
+} from "@/integrations/tanstack-store/chats-store";
+import ChatMessageRenderer from "./ChatMessageRenderer";
 
 const getPrompt = () => {
 	return `
@@ -74,16 +61,12 @@ const getProvider = (providerId: ProvidersEnum) => {
 };
 
 interface ChatViewProps {
-	conversationId?: number;
-	storedMessages: ChatMessage[];
+	conversationId?: string;
 }
 
 const bc = new BroadcastChannel("ai-channel");
 
-export default function ChatView({
-	conversationId,
-	storedMessages,
-}: ChatViewProps) {
+export default function ChatView({ conversationId }: ChatViewProps) {
 	const inputRef = useRef<HTMLTextAreaElement>(null);
 	const navigate = useNavigate();
 	const [selectedModel, setSelectedModelState] = useState<{
@@ -93,6 +76,9 @@ export default function ChatView({
 		model: ModelsInfo.Gemini_2_5_Flash.id,
 		provider: ProvidersInfo.google.id,
 	});
+
+	const [storedMessages, chatMessages] =
+		useSubscribeConversationMessages(conversationId);
 
 	const searchEnabled = useStore(
 		settingsStore,
@@ -105,30 +91,35 @@ export default function ChatView({
 		const input = inputRef.current?.value;
 		if (!input || !inputRef.current) throw new Error("Empty message");
 		inputRef.current.value = "";
-		const title = storedMessages.at(-1)?.content?.slice(0, 30) || "New Chat";
-		const convId = conversationId || (await createConversation(title));
-		await addMessage(convId, "user", input, {});
+		const title = input.slice(0, 30) || "New Chat";
+		const convId = conversationId || createConversation(title);
+
+		addMessage(convId, {
+			role: "user",
+			message: input,
+			conversationId: convId,
+			createdAt: new Date().toISOString(),
+			updatedAt: new Date().toISOString(),
+			meta_tokens: 0,
+		});
+
 		if (!conversationId) {
-			navigate({
-				to: "/chats/$conversationId",
-				params: { conversationId: convId.toString() },
-			});
+			navigate({ to: `/chats/${convId}` });
 		}
+
 		try {
 			let content = "";
 			const sources: Source[] = [];
 			const mappedMessages: CoreMessage[] = storedMessages.map((msg) => ({
-				role: msg.role as "user" | "assistant",
-				content: msg.content,
+				role: msg.role,
+				content: msg.message,
 			}));
 			mappedMessages.push({
 				role: "user",
 				content: input,
 			});
 
-			let msgId: number;
-
-			console.log("chat history", storedMessages.length);
+			console.log("chat history", storedMessages, mappedMessages);
 			const providerConfig =
 				ModelsInfo[selectedModel.model].providers[selectedModel.provider];
 			if (!providerConfig) {
@@ -138,6 +129,16 @@ export default function ChatView({
 			}
 			const generationConfig =
 				settingsStore.state[selectedModel.provider].config;
+
+			const [msgId, msgIndex] = addMessage(convId, {
+				role: "assistant",
+				message: content,
+				conversationId: convId,
+				createdAt: new Date().toISOString(),
+				updatedAt: new Date().toISOString(),
+				meta_tokens: 0,
+				status: "submitted",
+			});
 			await stream({
 				model: getProvider(selectedModel.provider).languageModel(
 					providerConfig.model,
@@ -145,36 +146,40 @@ export default function ChatView({
 				),
 				// prompt: getPrompt(),
 				messages: mappedMessages.filter(
-					(msg) => msg.content !== "" || msg.role !== "system",
+					(msg) => msg.content !== "" && msg.role !== "system",
 				),
 				system: getPrompt(),
 				maxSteps: 2,
 				async onChunk(chunk) {
 					console.log("Recieved chunk", chunk);
 					if (chunk.type === "text-delta") {
-						content += chunk.textDelta;
-						if (!msgId) {
-							msgId = await addMessage(convId, "assistant", content, {
-								model: selectedModel.model,
-								provider: selectedModel.provider,
-							});
-						} else {
-							updateMessage(msgId, content);
+						if (content.length === 0) {
+							updateMessage(msgIndex, convId, {
+								status: "generating",
+							})
 						}
+						content += chunk.textDelta;
+						updateMessageStream(msgIndex, convId, chunk.textDelta);
 					} else if (chunk.type === "source") {
-						if (msgId) {
+						if (msgIndex) {
 							sources.push(chunk.source as Source);
-							updateMessage(msgId, content, {
-								sources,
-							});
+							updateMessageStreamWithSources(msgIndex, convId,chunk.source);
 						}
 					}
 				},
 				async onError() {
-					await addMessage(convId, "system", "ERROR", {});
+					updateMessage(msgIndex, convId, {
+						status: "errored",
+						updatedAt: new Date().toISOString(),
+					});
 				},
 				onFinish({ usage, finishReason }) {
-					console.log("onFinish", { usage, finishReason });
+					updateMessage(msgIndex, convId, {
+						status: "done",
+						message: content,
+						updatedAt: new Date().toISOString(),
+						meta_tokens: usage.completionTokens,
+					});
 				},
 			});
 		} catch (e) {
@@ -196,72 +201,15 @@ export default function ChatView({
 
 	return (
 		<div className="flex flex-col flex-1 h-[calc(100vh-48px)] w-full">
-			<ChatMessageList>
-				{storedMessages?.map((message) =>
-					message.role === "user" ? (
-						<ChatBubble
-							key={message.id}
-							variant={message.role === "user" ? "sent" : "received"}
-						>
-							<ChatBubbleMessage
-								variant={message.role === "user" ? "sent" : "received"}
-							>
-								{message.content}
-							</ChatBubbleMessage>
-						</ChatBubble>
-					) : message.role === "assistant" ? (
-						<div
-							key={message.id}
-							className="prose prose-pink max-w-none dark:prose-invert prose-pre:m-0 prose-pre:bg-transparent prose-pre:p-0"
-						>
-							<Markdown
-								remarkPlugins={[remarkGfm]}
-								components={{
-									code: CodeHighlight,
-								}}
-							>
-								{message.content}
-							</Markdown>
-							{message.meta?.sources && message.meta.sources.length > 0 && (
-								<Accordion type="single" collapsible className="mt-4">
-									<AccordionItem value="sources">
-										<AccordionTrigger className="text-sm font-medium">
-											Sources
-										</AccordionTrigger>
-										<AccordionContent>
-											<div className="space-y-2">
-												{message.meta.sources.map((source, index) => (
-													<div key={index} className="text-sm">
-														<a
-															href={source.url}
-															target="_blank"
-															rel="noopener noreferrer"
-															className="text-primary hover:underline"
-														>
-															{source.title}
-														</a>
-													</div>
-												))}
-											</div>
-										</AccordionContent>
-									</AccordionItem>
-								</Accordion>
-							)}
-						</div>
-					) : (
-						<div
-							key={message.id}
-							className="bg-destructive/80 p-4 border-destructive-foreground rounded-lg"
-						>
-							User stopped generation
-						</div>
-					),
-				)}
-				{status === "submitted" && (
-					<ChatBubble variant="received">
-						<ChatBubbleMessage isLoading />
-					</ChatBubble>
-				)}
+			<ChatMessageList
+				messageStore={chatMessages.at(-1) || new Store<unknown>({})}
+			>
+				{chatMessages?.map((message) => (
+					<ChatMessageRenderer
+						key={message.state.id + crypto.randomUUID()}
+						chatMessageStore={message}
+					/>
+				))}
 			</ChatMessageList>
 			<div className="flex items-center p-4 border-t gap-2">
 				<DropdownMenu>

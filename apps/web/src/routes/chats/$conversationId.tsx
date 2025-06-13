@@ -1,26 +1,28 @@
 import ChatView from "@/components/Chat";
-import { createFileRoute } from "@tanstack/react-router";
-import {
-	useSubscribeConversationMessages,
-} from "@/integrations/drizzle-pglite/actions";
+import { conversationMapStore } from "@/integrations/tanstack-store/chats-store";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/chats/$conversationId")({
 	component: ChatPage,
 	beforeLoad({ params }) {
 		return {
-			conversationId: Number.parseInt(params.conversationId),
+			conversationId: params.conversationId,
 		};
+	},
+	loader: async ({ context }) => {
+		const conversation = conversationMapStore.state[context.conversationId];
+		if (!conversation) {
+			throw redirect({ to: "/" });
+		}
 	},
 });
 
 function ChatPage() {
 	const { conversationId } = Route.useRouteContext();
 
-	const msgs = useSubscribeConversationMessages(conversationId);
-
 	return (
 		<div className="flex-1 flex">
-			<ChatView conversationId={conversationId} storedMessages={msgs || []} />
+			<ChatView conversationId={conversationId} />
 		</div>
 	);
 }

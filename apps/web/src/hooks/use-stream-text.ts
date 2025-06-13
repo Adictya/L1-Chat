@@ -6,8 +6,8 @@ import {
 	type FinishReason,
 	type LanguageModel,
 	type LanguageModelUsage,
-    type StreamTextOnChunkCallback,
-    type Tool,
+	type StreamTextOnChunkCallback,
+	type Tool,
 } from "ai";
 
 type StreamStatus =
@@ -22,7 +22,11 @@ interface UseStreamTextOptions {
 	messages: CoreMessage[];
 	system?: string;
 	maxSteps?: number;
-	onChunk?: (chunk: Parameters<StreamTextOnChunkCallback<{[key: string]: Tool}>>[0]["chunk"]) => void;
+	onChunk?: (
+		chunk: Parameters<
+			StreamTextOnChunkCallback<{ [key: string]: Tool }>
+		>[0]["chunk"],
+	) => void;
 	onError?: (error: unknown) => void;
 	onFinish?: (event: {
 		usage: LanguageModelUsage;
@@ -39,6 +43,11 @@ export function useStreamText() {
 			setStatus("submitted");
 
 			abortController.current = new AbortController();
+			console.log(
+				"Abort controller ref",
+				abortController.current,
+				abortController.current.signal,
+			);
 			const result = streamText({
 				...options,
 				onChunk: (param) => {
@@ -65,7 +74,7 @@ export function useStreamText() {
 					options.onFinish?.(event);
 				},
 				abortSignal: abortController.current.signal,
-				// experimental_transform: [smoothStream()],
+				experimental_transform: [smoothStream()],
 			});
 
 			for await (const _ of result.textStream) {
@@ -93,4 +102,3 @@ export function useStreamText() {
 		stop,
 	};
 }
-

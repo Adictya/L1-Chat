@@ -1,1 +1,0 @@
-ALTER TABLE "chat_message" RENAME COLUMN "sources" TO "meta";

@@ -1,7 +1,7 @@
 import type { MigrationConfig } from "drizzle-orm/migrator";
 import db from "./db";
 import migrations from "./migrations.json";
-import { chatMessage, conversation } from "./schema";
+import { chatMessageTable, conversation } from "./schema";
 
 export async function migrate() {
 	console.log("Running migration");
@@ -11,7 +11,7 @@ export async function migrate() {
 	} satisfies Omit<MigrationConfig, "migrationsFolder">);
 
 	const conversations = await db.select().from(conversation);
-	const chats = await db.select().from(chatMessage);
+	const chats = await db.select().from(chatMessageTable);
 
 	console.log("conversations", conversations);
 	console.log("chats", chats);

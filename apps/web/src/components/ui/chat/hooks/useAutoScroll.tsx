@@ -1,4 +1,5 @@
 // @hidden
+import { Store, useStore } from "@tanstack/react-store";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 interface ScrollState {
@@ -9,14 +10,16 @@ interface ScrollState {
 interface UseAutoScrollOptions {
 	offset?: number;
 	smooth?: boolean;
-	content?: React.ReactNode;
+	messageStore: Store<unknown>;
 }
 
-export function useAutoScroll(options: UseAutoScrollOptions = {}) {
-	const { offset = 20, smooth = false, content } = options;
+export function useAutoScroll(options: UseAutoScrollOptions) {
+	const { offset = 20, smooth = false, messageStore } = options;
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const lastContentHeight = useRef(0);
 	const userHasScrolled = useRef(false);
+
+	const message = useStore(messageStore);
 
 	const [scrollState, setScrollState] = useState<ScrollState>({
 		isAtBottom: true,
@@ -94,7 +97,7 @@ export function useAutoScroll(options: UseAutoScrollOptions = {}) {
 			}
 			lastContentHeight.current = currentHeight;
 		}
-	}, [content, scrollState.autoScrollEnabled, scrollToBottom]);
+	}, [message, scrollState.autoScrollEnabled, scrollToBottom]);
 
 	useEffect(() => {
 		const element = scrollRef.current;
