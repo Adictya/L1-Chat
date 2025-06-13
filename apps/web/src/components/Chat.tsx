@@ -84,9 +84,7 @@ export default function ChatView({
 	conversationId,
 	storedMessages,
 }: ChatViewProps) {
-	const messageRef = useRef<HTMLTextAreaElement>(null);
-	const formRef = useRef<HTMLFormElement>(null);
-	const abortControllerRef = useRef<AbortController | null>(null);
+	const inputRef = useRef<HTMLTextAreaElement>(null);
 	const navigate = useNavigate();
 	const [selectedModel, setSelectedModelState] = useState<{
 		model: ModelsEnum;
@@ -103,12 +101,10 @@ export default function ChatView({
 
 	const { status, stream, stop } = useStreamText();
 
-	const onSubmit = async (e: Event | undefined) => {
-		e?.preventDefault();
-
-		const input = messageRef.current?.value;
-		if (!input || !messageRef.current) throw new Error("Empty message");
-		messageRef.current.value = "";
+	const onSubmit = async () => {
+		const input = inputRef.current?.value;
+		if (!input || !inputRef.current) throw new Error("Empty message");
+		inputRef.current.value = "";
 		const title = storedMessages.at(-1)?.content?.slice(0, 30) || "New Chat";
 		const convId = conversationId || (await createConversation(title));
 		await addMessage(convId, "user", input, {});
@@ -195,10 +191,7 @@ export default function ChatView({
 
 	const handleStop = () => {
 		console.log("Cancelling");
-		if (abortControllerRef.current) {
-			abortControllerRef.current.abort();
-			abortControllerRef.current = null;
-		}
+		stop();
 	};
 
 	return (
@@ -260,7 +253,7 @@ export default function ChatView({
 							key={message.id}
 							className="bg-destructive/80 p-4 border-destructive-foreground rounded-lg"
 						>
-							Request failed
+							User stopped generation
 						</div>
 					),
 				)}
@@ -270,11 +263,7 @@ export default function ChatView({
 					</ChatBubble>
 				)}
 			</ChatMessageList>
-			<form
-				ref={formRef}
-				onSubmit={onSubmit}
-				className="flex items-center p-4 border-t gap-2"
-			>
+			<div className="flex items-center p-4 border-t gap-2">
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<Button variant="outline" className="w-[180px]">
@@ -316,29 +305,25 @@ export default function ChatView({
 					</Button>
 				)}
 				<ChatInput
-					ref={messageRef}
+					ref={inputRef}
 					onKeyDown={(e) => {
 						if (e.key === "Enter" && !e.shiftKey) {
 							e.preventDefault();
-							if (formRef.current) onSubmit(undefined);
+							onSubmit();
 						}
 					}}
 					className="flex-1 min-h-12 bg-background"
 				/>
-				{status === "generating" || status === "reasoning" ? (
+				{status !== "ready" && status !== "error" ? (
 					<Button type="button" size="icon" onClick={handleStop}>
 						<Square className="size-4" />
 					</Button>
 				) : (
-					<Button
-						type="submit"
-						size="icon"
-						disabled={status !== "ready" && status !== "error"}
-					>
+					<Button type="button" onClick={() => onSubmit()} size="icon">
 						<Send className="size-4" />
 					</Button>
 				)}
-			</form>
+			</div>
 		</div>
 	);
 }
