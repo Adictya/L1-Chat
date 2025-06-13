@@ -5,6 +5,7 @@ import {
 	integer,
 	index,
 	text,
+	jsonb,
 } from "drizzle-orm/pg-core";
 
 export const account = pgTable(
@@ -37,9 +38,25 @@ export const chatMessage = pgTable("chat_message", {
 		.references(() => conversation.id, { onDelete: "cascade" }),
 	role: varchar("role", { length: 255 }).notNull(),
 	content: text("content").notNull(),
+	meta: jsonb("meta")
+		.$type<{
+			model?: string;
+			provider?: string;
+			reasoning?: string;
+			sources?: Source[];
+		}>()
+		.notNull()
+		.default({}),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+export type Source = {
+	id: string;
+	sourceType: string;
+	title: string;
+	url: string;
+};
 
 export type ChatMessage = typeof chatMessage.$inferSelect;
 

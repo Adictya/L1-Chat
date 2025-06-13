@@ -6,6 +6,8 @@ import {
 	type FinishReason,
 	type LanguageModel,
 	type LanguageModelUsage,
+    type StreamTextOnChunkCallback,
+    type Tool,
 } from "ai";
 
 type StreamStatus =
@@ -20,7 +22,7 @@ interface UseStreamTextOptions {
 	messages: CoreMessage[];
 	system?: string;
 	maxSteps?: number;
-	onChunk?: (chunk: { type: string; textDelta?: string }) => void;
+	onChunk?: (chunk: Parameters<StreamTextOnChunkCallback<{[key: string]: Tool}>>[0]["chunk"]) => void;
 	onError?: (error: unknown) => void;
 	onFinish?: (event: {
 		usage: LanguageModelUsage;
@@ -39,15 +41,16 @@ export function useStreamText() {
 			abortController.current = new AbortController();
 			const result = streamText({
 				...options,
-				onChunk: ({ chunk }) => {
-					if (chunk.type === "reasoning") {
+				onChunk: (param) => {
+					if (param.chunk.type === "reasoning") {
 						setStatus("reasoning");
-					} else if (chunk.type === "text-delta") {
+					} else if (param.chunk.type === "text-delta") {
 						setStatus("generating");
 					}
-					options.onChunk?.(chunk);
+					options.onChunk?.(param.chunk);
 				},
 				onError: (error: { error: unknown }) => {
+					console.log("Error", error);
 					if (
 						error.error instanceof Error &&
 						error.error.name === "AbortError"
@@ -55,6 +58,8 @@ export function useStreamText() {
 						setStatus("ready");
 					}
 					options.onError?.(error);
+					setStatus("error");
+					throw new Error("Generation failed");
 				},
 				onFinish: (event) => {
 					options.onFinish?.(event);

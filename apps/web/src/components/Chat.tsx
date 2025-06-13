@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChatMessageList } from "./ui/chat/chat-message-list";
 import { ChatBubble, ChatBubbleMessage } from "./ui/chat/chat-bubble";
 import { Button } from "./ui/button";
-import { Send, Square } from "lucide-react";
+import { Globe, Send, Square } from "lucide-react";
 import { ChatInput } from "./ui/chat/chat-input";
 import {
 	DropdownMenu,
@@ -13,7 +13,7 @@ import {
 	DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { useChat } from "@ai-sdk/react";
-import type { ChatMessage } from "l1-db";
+import type { ChatMessage, Source } from "l1-db";
 import {
 	smoothStream,
 	streamText,
@@ -30,16 +30,28 @@ import {
 	addMessage,
 	updateMessage,
 } from "@/integrations/drizzle-pglite/actions";
-import { getSettings } from "@/integrations/tanstack-store/settings-store";
+import settingsStore, {
+	getSettings,
+	toggleSearch,
+} from "@/integrations/tanstack-store/settings-store";
 import {
 	ModelsInfo,
 	ProvidersInfo,
 	type ModelsEnum,
 	type ProvidersEnum,
 	PerAvailableModelProvidersList,
+	Providers,
 } from "@/integrations/tanstack-store/models-store";
 import { CodeHighlight } from "./CodeHighlighter";
 import { useStreamText } from "@/hooks/use-stream-text";
+import { useStore } from "@tanstack/react-store";
+import { cn } from "@/lib/utils";
+import {
+	Accordion,
+	AccordionContent,
+	AccordionItem,
+	AccordionTrigger,
+} from "./ui/accordion";
 
 const getPrompt = () => {
 	return `
@@ -84,6 +96,11 @@ export default function ChatView({
 		provider: ProvidersInfo.google.id,
 	});
 
+	const searchEnabled = useStore(
+		settingsStore,
+		(store) => store.google.config.useSearchGrounding,
+	);
+
 	const { status, stream, stop } = useStreamText();
 
 	const onSubmit = async (e: Event | undefined) => {
@@ -94,7 +111,7 @@ export default function ChatView({
 		messageRef.current.value = "";
 		const title = storedMessages.at(-1)?.content?.slice(0, 30) || "New Chat";
 		const convId = conversationId || (await createConversation(title));
-		await addMessage(convId, "user", input);
+		await addMessage(convId, "user", input, {});
 		if (!conversationId) {
 			navigate({
 				to: "/chats/$conversationId",
@@ -103,17 +120,19 @@ export default function ChatView({
 		}
 		try {
 			let content = "";
+			const sources: Source[] = [];
 			const mappedMessages: CoreMessage[] = storedMessages.map((msg) => ({
-				role: msg.role === "user" ? "user" : "assistant",
+				role: msg.role as "user" | "assistant",
 				content: msg.content,
 			}));
 			mappedMessages.push({
 				role: "user",
 				content: input,
 			});
-			const msgId = await addMessage(convId, "assistant", content);
 
-			console.log("addedMessage", msgId, mappedMessages);
+			let msgId: number;
+
+			console.log("chat history", storedMessages.length);
 			const providerConfig =
 				ModelsInfo[selectedModel.model].providers[selectedModel.provider];
 			if (!providerConfig) {
@@ -121,21 +140,45 @@ export default function ChatView({
 					`No provider config found for model ${selectedModel.model} and provider ${selectedModel.provider}`,
 				);
 			}
+			const generationConfig =
+				settingsStore.state[selectedModel.provider].config;
 			await stream({
 				model: getProvider(selectedModel.provider).languageModel(
 					providerConfig.model,
+					generationConfig,
 				),
 				// prompt: getPrompt(),
-				messages: mappedMessages.filter((msg) => msg.content !== ""),
+				messages: mappedMessages.filter(
+					(msg) => msg.content !== "" || msg.role !== "system",
+				),
 				system: getPrompt(),
 				maxSteps: 2,
-				onChunk(chunk) {
+				async onChunk(chunk) {
+					console.log("Recieved chunk", chunk);
 					if (chunk.type === "text-delta") {
-						console.log("Recieved chunk");
 						content += chunk.textDelta;
-						updateMessage(msgId, content);
-					} else if (chunk.type === "reasoning") {
+						if (!msgId) {
+							msgId = await addMessage(convId, "assistant", content, {
+								model: selectedModel.model,
+								provider: selectedModel.provider,
+							});
+						} else {
+							updateMessage(msgId, content);
+						}
+					} else if (chunk.type === "source") {
+						if (msgId) {
+							sources.push(chunk.source as Source);
+							updateMessage(msgId, content, {
+								sources,
+							});
+						}
 					}
+				},
+				async onError() {
+					await addMessage(convId, "system", "ERROR", {});
+				},
+				onFinish({ usage, finishReason }) {
+					console.log("onFinish", { usage, finishReason });
 				},
 			});
 		} catch (e) {
@@ -173,10 +216,10 @@ export default function ChatView({
 								{message.content}
 							</ChatBubbleMessage>
 						</ChatBubble>
-					) : (
+					) : message.role === "assistant" ? (
 						<div
 							key={message.id}
-							className="prose prose-pink max-w-none dark:prose-invert prose-pre:m-0 prose-pre:bg-transparent prose-pre:p-0 "
+							className="prose prose-pink max-w-none dark:prose-invert prose-pre:m-0 prose-pre:bg-transparent prose-pre:p-0"
 						>
 							<Markdown
 								remarkPlugins={[remarkGfm]}
@@ -186,6 +229,38 @@ export default function ChatView({
 							>
 								{message.content}
 							</Markdown>
+							{message.meta?.sources && message.meta.sources.length > 0 && (
+								<Accordion type="single" collapsible className="mt-4">
+									<AccordionItem value="sources">
+										<AccordionTrigger className="text-sm font-medium">
+											Sources
+										</AccordionTrigger>
+										<AccordionContent>
+											<div className="space-y-2">
+												{message.meta.sources.map((source, index) => (
+													<div key={index} className="text-sm">
+														<a
+															href={source.url}
+															target="_blank"
+															rel="noopener noreferrer"
+															className="text-primary hover:underline"
+														>
+															{source.title}
+														</a>
+													</div>
+												))}
+											</div>
+										</AccordionContent>
+									</AccordionItem>
+								</Accordion>
+							)}
+						</div>
+					) : (
+						<div
+							key={message.id}
+							className="bg-destructive/80 p-4 border-destructive-foreground rounded-lg"
+						>
+							Request failed
 						</div>
 					),
 				)}
@@ -227,6 +302,19 @@ export default function ChatView({
 						))}
 					</DropdownMenuContent>
 				</DropdownMenu>
+				{selectedModel.provider === Providers.google && (
+					<Button
+						type="button"
+						size="icon"
+						variant={searchEnabled ? "default" : "outline"}
+						onClick={() => {
+							toggleSearch();
+						}}
+						// className={searchEnabled ? "" : "opacity-50"}
+					>
+						<Globe className="size-4" />
+					</Button>
+				)}
 				<ChatInput
 					ref={messageRef}
 					onKeyDown={(e) => {
@@ -237,7 +325,6 @@ export default function ChatView({
 					}}
 					className="flex-1 min-h-12 bg-background"
 				/>
-				{status}
 				{status === "generating" || status === "reasoning" ? (
 					<Button type="button" size="icon" onClick={handleStop}>
 						<Square className="size-4" />

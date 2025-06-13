@@ -8,6 +8,7 @@
     "drizzle-kit": "^0.31.1"
   },
   "scripts": {
+    "db:migrate": "bun x drizzle-kit generate",
     "generate-migrations": "bun x drizzle-kit generate && bun run ./scripts/compile-migrations.ts"
   },
   "exports": {
