@@ -5,50 +5,15 @@ import { and, eq } from "drizzle-orm";
 import migrations from "../migrations.json";
 import * as schema from "./schema";
 import type { MigrationConfig } from "drizzle-orm/migrator";
-import type { Conversation, ChatMessage } from "./schema";
+import type { ChatMessage } from "./schema";
+import { SyncEventManager, BroadcastChannelTransport } from "l1-sync";
 
-type SyncEventType =
-	| "populateConversations"
-	| "createConversation"
-	| "addMessage"
-	| "updateMessage"
-	| "updateMessageStream";
-
-interface BaseSyncEvent {
-	type: SyncEventType;
-	timestamp: number;
-}
-
-interface CreateConversationEvent extends BaseSyncEvent {
-	type: "createConversation";
-	conversation: Conversation;
-}
-
-interface AddMessageEvent extends BaseSyncEvent {
-	type: "addMessage";
-	conversationId: string;
-	message: ChatMessage;
-}
-
-interface UpdateMessageEvent extends BaseSyncEvent {
-	type: "updateMessage";
-	messageIndex: number;
-	conversationId: string;
-	message: ChatMessage;
-}
-
-interface UpdateMessageStreamEvent extends BaseSyncEvent {
-	type: "updateMessageStream";
-	messageIndex: number;
-	conversationId: string;
-	part: string;
-}
-
-type SyncEvent =
-	| CreateConversationEvent
-	| AddMessageEvent
-	| UpdateMessageEvent
-	| UpdateMessageStreamEvent;
+// Initialize SyncEventManager
+const syncEventManager = new SyncEventManager();
+const broadcastChannelTransport = new BroadcastChannelTransport(
+	"l1-chat-sync-events",
+);
+syncEventManager.addTransport(broadcastChannelTransport);
 
 worker({
 	async init(options) {
@@ -65,85 +30,59 @@ worker({
 		} satisfies Omit<MigrationConfig, "migrationsFolder">);
 		console.log("Migrations ran");
 
-		// Set up broadcast channel listener
-		const syncChannel = new BroadcastChannel("l1-chat-sync-events");
-		syncChannel.onmessage = (message: unknown) => {
-			const event = message as MessageEvent<SyncEvent>;
-			const data = event.data;
-			const { type, ...params } = data;
-
-			console.log("[Broadcast] Received event in worker:", {
-				type,
-				params,
-				timestamp: Date.now(),
-			});
-
-			switch (type) {
-				case "createConversation": {
-					const { conversation } = params as CreateConversationEvent;
-					console.log("[DB] Persisting conversation:", conversation);
-					db.insert(schema.conversation)
-						.values({
-							id: conversation.id,
-							data: conversation,
-						})
-						.then(() => {
-							console.log("Conversation persisted:", conversation.id);
-						})
-						.catch((error) => {
-							console.error("Error persisting conversation:", error);
-						});
-					console.log("[DB] Conversation persisted:", conversation.id);
-					break;
-				}
-				case "addMessage": {
-					const { message } = params as AddMessageEvent;
-					console.log("[DB] Persisting message:", message);
-					db.insert(schema.chatMessageTable)
-						.values({
-							id: message.id,
-							conversationId: message.conversationId,
-							data: message,
-						})
-						.then(() => {
-							console.log("Message persisted:", message.id);
-						})
-						.catch((error) => {
-							console.error("Error persisting message:", error);
-						});
-					console.log("[DB] Message persisted:", message.id);
-					break;
-				}
-				case "updateMessage": {
-					const { conversationId, message } = params as UpdateMessageEvent;
-					// For update messages, we need to fetch the existing message first
-					console.log("[DB] Updating message:", message);
-					db.query.chatMessageTable
-						.findFirst({
-							where: and(
-								eq(schema.chatMessageTable.id, message.id),
-								eq(schema.chatMessageTable.conversationId, conversationId),
-							),
-						})
-						.then(async (existingMessage) => {
-							if (existingMessage) {
-								const updatedMessage = { ...existingMessage.data, ...message };
-
-								await db
-									.update(schema.chatMessageTable)
-									.set({ data: updatedMessage as ChatMessage })
-									.where(eq(schema.chatMessageTable.id, existingMessage.id));
-								console.log("Message updated:", existingMessage.id);
-							}
-						})
-						.catch((error) => {
-							console.error("Error updating message:", error);
-						});
-					console.log("[DB] Message updated:", conversationId);
-					break;
-				}
+		// Register event handlers
+		syncEventManager.on<"createConversation">("createConversation", async (eventData) => {
+			const { conversation } = eventData;
+			console.log("[DB] Persisting conversation:", conversation);
+			try {
+				await db.insert(schema.conversation).values({
+					id: conversation.id,
+					data: conversation,
+				});
+				console.log("[DB] Conversation persisted:", conversation.id);
+			} catch (error) {
+				console.error("Error persisting conversation:", error);
 			}
-		};
+		});
+
+		syncEventManager.on<"addMessage">("addMessage", async (eventData) => {
+			const { message } = eventData;
+			console.log("[DB] Persisting message:", message);
+			try {
+				await db.insert(schema.chatMessageTable).values({
+					id: message.id,
+					conversationId: message.conversationId,
+					data: message,
+				});
+				console.log("[DB] Message persisted:", message.id);
+			} catch (error) {
+				console.error("Error persisting message:", error);
+			}
+		});
+
+		syncEventManager.on<"updateMessage">("updateMessage", async (eventData) => {
+			const { conversationId, message } = eventData;
+			console.log("[DB] Updating message:", message);
+			try {
+				const existingMessage = await db.query.chatMessageTable.findFirst({
+					where: and(
+						eq(schema.chatMessageTable.id, message.id),
+						eq(schema.chatMessageTable.conversationId, conversationId),
+					),
+				});
+
+				if (existingMessage) {
+					const updatedMessage = { ...existingMessage.data, ...message };
+					await db
+						.update(schema.chatMessageTable)
+						.set({ data: updatedMessage as ChatMessage })
+						.where(eq(schema.chatMessageTable.id, existingMessage.id));
+					console.log("[DB] Message updated:", existingMessage.id);
+				}
+			} catch (error) {
+				console.error("Error updating message:", error);
+			}
+		});
 
 		return pgLiteClient;
 	},

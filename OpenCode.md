@@ -1,39 +1,22 @@
-# OpenCode Context for l1-chat
+# Context for l1-chat Agent
 
 ## Project Overview
-This is a monorepo using Bun workspaces.
-- Frontend (`apps/web`): React (Vite), TypeScript, TanStack Router, Tailwind CSS, Shadcn UI.
-- Backend (`apps/server`): Hono (Bun runtime), TypeScript.
-- Database (`lib/db`): Drizzle ORM, PGlite.
+Monorepo (Bun workspaces). Frontend: `apps/web` (React/Vite/TS/Tailwind/Shadcn). Backend: `apps/server` (Hono/Bun/TS). DB: `lib/db` (Drizzle/PGlite).
+**Rule: Prioritize Bun.** Use `bun` for scripts, tests, installs (`bun install`, `bun run dev`, `bun test`). Prefer Bun APIs (`Bun.serve`, `Bun.file`) over Node/etc. See `.cursor/rules/use-bun-instead-of-node-vite-npm-pnpm.mdc`.
 
-## Common Commands
+## Common Commands (cd to dir if specified)
+- Root: `bun install` (install all), `bun run dev` (run web+server dev)
+- `apps/web`:
+  - `bun run dev` (dev server), `bun run build` (build)
+  - `bun run test` (all tests) | `... test src/file.tsx` (single file) | `... test -t "name"` (by name)
+  - `bun run check` (lint & format with Biome)
+- `apps/server`: `bun run dev`
+- `lib/db`: `bun run generate-migrations`
 
-### Workspace Root
-- Install all dependencies: `bun install`
-- Run web and server dev environments: `bun run dev`
-
-### Web App (`apps/web`)
-- Start dev server: `cd apps/web && bun run dev`
-- Build for production: `cd apps/web && bun run build`
-- Run tests: `cd apps/web && bun run test`
-  - Single test file: `cd apps/web && bun run test src/components/Chat.test.tsx`
-  - Specific test name: `cd apps/web && bun run test -t "should render chat messages"`
-- Lint: `cd apps/web && bun run lint` (Biome)
-- Format: `cd apps/web && bun run format` (Biome)
-- Check (lint & format): `cd apps/web && bun run check`
-
-### Server App (`apps/server`)
-- Start dev server: `cd apps/server && bun run dev`
-- Deploy: `cd apps/server && bun run deploy`
-
-### Database (`lib/db`)
-- Generate migrations: `cd lib/db && bun run generate-migrations`
-
-## Code Style (mainly from `apps/web/biome.json`)
-- Formatting: Tabs for indentation, double quotes for strings. Biome handles this.
-- Imports: Auto-organized by Biome. Use path aliases like `@/components/*`.
-- Naming: PascalCase for components (e.g., `AppSidebar`), camelCase for functions/variables.
-- Types: TypeScript is strictly used. Define types/interfaces. Zod for runtime validation.
-- Error Handling: Standard `try/catch` and `throw new Error()`.
-- UI Components: Follow Shadcn UI patterns.
-- API: Hono for server routes.
+## Code Style (main: `apps/web/biome.json`)
+- Formatting: Tabs, double quotes (Biome enforces in `apps/web`).
+- Imports: Auto-organized by Biome; path aliases like `@/components/*`.
+- Naming: `PascalCase` (Components), `camelCase` (functions/variables).
+- Types: Strict TypeScript. Use Zod for runtime validation.
+- Error Handling: Standard `try/catch`, `throw new Error()`.
+- UI: Shadcn UI patterns. API: Hono for server.

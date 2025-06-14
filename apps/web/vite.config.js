@@ -10,6 +10,7 @@ import { warn } from "node:console";
 export default defineConfig({
 	server: {
 		port: 3001,
+		allowedHosts: [".localhost", ".ngrok-free.app"],
 	},
 	plugins: [
 		TanStackRouterVite({ autoCodeSplitting: true }),
