@@ -13,6 +13,7 @@
   },
   "exports": {
     ".": "./index.ts",
+    "./local": "./src/db-local.ts",
     "./worker": "./src/pglite-worker.ts"
   },
   "peerDependencies": {

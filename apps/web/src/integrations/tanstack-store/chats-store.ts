@@ -38,9 +38,14 @@ export const chatsStore = new Store<
 >({});
 
 export const chatsListStore = new Derived({
-	fn: () => Object.values(chatsStore.state),
+	fn: () => {
+		console.log("Chats list store changed", chatsStore.state);
+		return Object.values(chatsStore.state);
+	},
 	deps: [chatsStore],
 });
+
+chatsListStore.mount();
 
 // Initialize SyncEventManager
 const syncEventManager = new SyncEventManager();
@@ -49,9 +54,8 @@ const broadcastChannelTransport = new BroadcastChannelTransport(
 );
 syncEventManager.addTransport(broadcastChannelTransport);
 
-chatsListStore.mount();
-
 export async function PopulateConversations(pg: PGliteWorker) {
+	console.log("Populating conversations");
 	const query = db
 		.select()
 		.from(conversation)
@@ -101,6 +105,17 @@ export function useSubscribeConversationMessages(conversationId?: string) {
 	return [chatHistory, chatMessages] as const;
 }
 
+export function createConversationDirect(conversation: Conversation) {
+	conversationMapStore.setState((prev) => ({
+		...prev,
+		[conversation.id]: new Store(conversation),
+	}));
+	chatsStore.setState((prev) => ({
+		...prev,
+		[conversation.id]: new Store([] as ChatMessageStore[]),
+	}));
+}
+
 export function createConversation(title: string, noBroadcast?: boolean) {
 	const conversationId = crypto.randomUUID();
 	const newConversation: Conversation = {
@@ -147,6 +162,16 @@ conversationMapStore.subscribe((state) => {
 conversationsListStore.subscribe((state) => {
 	console.log("Conversation list store changed", state);
 });
+
+export function addMessageDirect(conversationId: string, message: ChatMessage) {
+	const chatMessageListStore = chatsStore.state[conversationId];
+	if (!chatMessageListStore) {
+		console.log(chatsStore.state);
+		throw new Error("Conversation not found");
+	}
+	const messageStore = new Store<ChatMessage>(message);
+	chatMessageListStore.setState((prev) => [...prev, messageStore]);
+}
 
 export function addMessage(
 	conversationId: string,
@@ -281,7 +306,7 @@ syncEventManager.on<"createConversation">("createConversation", (eventData) => {
 	console.log("[SyncEventManager] Processing createConversation event:", {
 		conversation,
 	});
-	createConversation(conversation.id, true);
+	createConversationDirect(conversation);
 });
 
 syncEventManager.on<"addMessage">("addMessage", (eventData) => {
@@ -290,7 +315,7 @@ syncEventManager.on<"addMessage">("addMessage", (eventData) => {
 		conversationId,
 		message,
 	});
-	addMessage(conversationId, message, true);
+	addMessageDirect(conversationId, message);
 });
 
 syncEventManager.on<"updateMessage">("updateMessage", (eventData) => {

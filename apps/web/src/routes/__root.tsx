@@ -15,7 +15,6 @@ import type { PGliteWithLive } from "@electric-sql/pglite/live";
 interface MyRouterContext {
 	queryClient: QueryClient;
 	// syncWorker: SyncWorker;
-	pg: PGliteWithLive;
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
@@ -30,7 +29,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 					</div>
 				</SidebarInset>
 			</SidebarProvider>
-			<TanStackRouterDevtools position="top-right"/>
+			<TanStackRouterDevtools position="top-right" />
 			<TanStackQueryLayout />
 		</>
 	),

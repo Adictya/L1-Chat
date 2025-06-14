@@ -1,6 +1,7 @@
-import { live } from "@electric-sql/pglite/live";
-import { QueryBuilder } from "drizzle-orm/pg-core";
+import type { PGlite } from "@electric-sql/pglite";
+import type * as schema from "./schema";
 import { PGliteWorker } from "@electric-sql/pglite/worker";
+import type { PgliteDatabase } from "drizzle-orm/pglite";
 
 export const createPGLite = async (worker: Worker, apiKey: string) => {
 	return await PGliteWorker.create(worker, {
@@ -8,14 +9,9 @@ export const createPGLite = async (worker: Worker, apiKey: string) => {
 		meta: {
 			apiKey,
 		},
-		extensions: {
-			live,
-		},
 	});
 };
 
-const db = new QueryBuilder();
-
-export type DB = typeof db;
-
-export default db;
+export type DB = PgliteDatabase<typeof schema> & {
+	$client: PGlite;
+};

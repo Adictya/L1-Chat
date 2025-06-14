@@ -7,5 +7,8 @@
   },
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "dependencies": {
+    "nanoevents": "^9.1.0"
   }
 }

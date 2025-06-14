@@ -1,9 +1,9 @@
 import type { MigrationConfig } from "drizzle-orm/migrator";
-import db from "./db";
-import migrations from "./migrations.json";
+import type { DB } from "./db";
+import migrations from "../migrations.json";
 import { chatMessageTable, conversation } from "./schema";
 
-export async function migrate() {
+export async function migrate(db: DB) {
 	console.log("Running migration");
 	// @ts-expect-error: non public APIS
 	await db.dialect.migrate(migrations, db.session, {

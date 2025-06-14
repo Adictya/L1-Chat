@@ -1,4 +1,5 @@
 import type { Conversation, ChatMessage, Source } from "l1-db";
+import type { ITransport } from "./transports/transport";
 
 // Core Event Types and Interfaces
 export type SyncEventType =
@@ -6,11 +7,14 @@ export type SyncEventType =
 	| "addMessage"
 	| "updateMessage"
 	| "updateMessageStream"
-	| "updateMessageStreamWithSources";
+	| "updateMessageStreamWithSources"
+	| "clientIdSync";
 
 export interface BaseSyncEvent {
 	type: SyncEventType;
 	timestamp: number;
+	transportId?: string;
+	clientId?: string;
 }
 
 export interface CreateConversationEvent extends BaseSyncEvent {
@@ -45,19 +49,18 @@ export interface UpdateMessageStreamWithSourcesEvent extends BaseSyncEvent {
 	source: Source;
 }
 
+export interface ClientIdSync extends BaseSyncEvent {
+	type: "clientIdSync";
+	clientId: string;
+}
+
 export type SyncEvent =
 	| CreateConversationEvent
 	| AddMessageEvent
 	| UpdateMessageEvent
 	| UpdateMessageStreamEvent
-	| UpdateMessageStreamWithSourcesEvent;
-
-// Transport Interface
-export interface ITransport {
-	send(event: SyncEvent): void | Promise<void>;
-	onMessage(handler: (event: SyncEvent) => void): void;
-	close(): void;
-}
+	| UpdateMessageStreamWithSourcesEvent
+	| ClientIdSync;
 
 // Event Handler Types
 type EventHandler<E extends SyncEvent> = (payload: E) => void;
@@ -65,12 +68,19 @@ type HandlerMap = {
 	[K in SyncEventType]?: EventHandler<Extract<SyncEvent, { type: K }>>[];
 };
 
+type TransformFunction = (event: SyncEvent) => SyncEvent;
+
+interface Pipe {
+	from: ITransport;
+	to: ITransport;
+	transform?: TransformFunction;
+}
+
 // SyncEventManager Class
 export class SyncEventManager {
 	private transports: ITransport[] = [];
 	private handlers: HandlerMap = {};
-
-	constructor() {}
+	private pipes: Pipe[] = [];
 
 	addTransport(transport: ITransport): void {
 		this.transports.push(transport);
@@ -85,6 +95,55 @@ export class SyncEventManager {
 			}
 			return true;
 		});
+
+		// Remove any pipes that use this transport
+		this.pipes = this.pipes.filter(
+			(pipe) =>
+				pipe.from !== transportToRemove && pipe.to !== transportToRemove,
+		);
+	}
+
+	addPipe(
+		from: ITransport,
+		to: ITransport,
+		transform?: TransformFunction,
+	): void {
+		// Ensure both transports are registered
+		if (!this.transports.includes(from)) {
+			throw new Error(
+				"Source transport must be added to SyncEventManager first",
+			);
+		}
+		if (!this.transports.includes(to)) {
+			throw new Error(
+				"Target transport must be added to SyncEventManager first",
+			);
+		}
+
+		// Check for existing pipe
+		const existingPipe = this.pipes.find(
+			(pipe) => pipe.from === from && pipe.to === to,
+		);
+		if (existingPipe) {
+			throw new Error(
+				`Pipe already exists from ${from.constructor.name} to ${to.constructor.name}`,
+			);
+		}
+
+		// Create pipe handler
+		const pipeHandler = (event: SyncEvent) => {
+			const transformedEvent = transform ? transform(event) : event;
+			to.send(transformedEvent);
+		};
+
+		// Store pipe configuration
+		this.pipes.push({ from, to, transform });
+	}
+
+	removePipe(from: ITransport, to: ITransport): void {
+		this.pipes = this.pipes.filter(
+			(pipe) => pipe.from !== from || pipe.to !== to,
+		);
 	}
 
 	emit<T extends SyncEventType>(
@@ -93,10 +152,8 @@ export class SyncEventManager {
 		const eventWithTimestamp = {
 			...eventData,
 			timestamp: Date.now(),
-		} as Extract<SyncEvent, { type: T }>; // Asserting type after adding timestamp
-
-		// console.log("[SyncEventManager] Emitting event:", eventWithTimestamp);
-		this.transports.forEach((transport) => {
+		} as Extract<SyncEvent, { type: T }>;
+		for (const transport of this.transports) {
 			try {
 				transport.send(eventWithTimestamp);
 			} catch (error) {
@@ -105,7 +162,7 @@ export class SyncEventManager {
 					error,
 				);
 			}
-		});
+		}
 	}
 
 	on<T extends SyncEventType>(
@@ -115,7 +172,8 @@ export class SyncEventManager {
 		if (!this.handlers[eventType]) {
 			this.handlers[eventType] = [];
 		}
-		this.handlers[eventType]?.push(handler as any); // any due to complex conditional type
+		// biome-ignore lint/suspicious/noExplicitAny: complex conditional type
+		this.handlers[eventType]?.push(handler as any);
 	}
 
 	off<T extends SyncEventType>(
@@ -126,53 +184,49 @@ export class SyncEventManager {
 		if (eventHandlers) {
 			// @ts-expect-error: TODO: Fix this
 			this.handlers[eventType] = eventHandlers.filter(
-				(handler) => handler !== (handlerToRemove as any), // any due to complex conditional type
+				// biome-ignore lint/suspicious/noExplicitAny: complex conditional type
+				(handler) => handler !== (handlerToRemove as any),
 			);
 		}
 	}
 
 	private handleIncomingEvent(event: SyncEvent): void {
+		console.log("Incoming event", event);
+		if (!event.transportId) {
+			console.warn("Event has no transportId", event);
+			return;
+		}
 		const eventHandlers = this.handlers[event.type];
 		if (eventHandlers) {
-			eventHandlers.forEach((handler) => {
+			for (const handler of eventHandlers) {
 				try {
-					handler(event as any); // any due to complex conditional type
+					handler(
+						// @ts-expect-error: TODO: Fix this
+						event as unknown as Extract<SyncEvent, { type: typeof event.type }>,
+					);
 				} catch (error) {
 					console.error(
 						`[SyncEventManager] Error executing handler for ${event.type}:`,
 						error,
 					);
 				}
-			});
+			}
+		}
+		const pipes = this.pipes.filter(
+			(pipe) => pipe.from.id === event.transportId,
+		);
+		for (const pipe of pipes) {
+			const transformedEvent = pipe.transform ? pipe.transform(event) : event;
+			pipe.to.send(transformedEvent);
 		}
 	}
 
 	destroy(): void {
-		this.transports.forEach((transport) => transport.close());
+		for (const transport of this.transports) {
+			transport.close();
+		}
 		this.transports = [];
 		this.handlers = {};
-	}
-}
-
-// Example: BroadcastChannel Transport (can be in its own file later)
-export class BroadcastChannelTransport implements ITransport {
-	private channel: BroadcastChannel;
-
-	constructor(channelName: string) {
-		this.channel = new BroadcastChannel(channelName);
-	}
-
-	send(event: SyncEvent): void {
-		this.channel.postMessage(event);
-	}
-
-	onMessage(handler: (event: SyncEvent) => void): void {
-		this.channel.onmessage = (msgEvent: MessageEvent<SyncEvent>) => {
-			handler(msgEvent.data);
-		};
-	}
-
-	close(): void {
-		this.channel.close();
+		this.pipes = [];
 	}
 }
