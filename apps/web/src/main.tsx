@@ -19,7 +19,6 @@ const router = createRouter({
 	routeTree,
 	context: {
 		...TanStackQueryProvider.getContext(),
-		pg,
 	},
 	defaultPreload: "intent",
 	scrollRestoration: true,
@@ -42,11 +41,9 @@ if (rootElement && !rootElement.innerHTML) {
 	const root = ReactDOM.createRoot(rootElement);
 	root.render(
 		<StrictMode>
-			<PGliteProvider db={pg}>
-				<TanStackQueryProvider.Provider>
-					<RouterProvider router={router} />
-				</TanStackQueryProvider.Provider>
-			</PGliteProvider>
+			<TanStackQueryProvider.Provider>
+				<RouterProvider router={router} />
+			</TanStackQueryProvider.Provider>
 		</StrictMode>,
 	);
 }

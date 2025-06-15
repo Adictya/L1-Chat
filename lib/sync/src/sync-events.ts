@@ -4,11 +4,16 @@ import type { ITransport } from "./transports/transport";
 // Core Event Types and Interfaces
 export type SyncEventType =
 	| "createConversation"
+	| "createConversationBranch"
 	| "addMessage"
 	| "updateMessage"
 	| "updateMessageStream"
 	| "updateMessageStreamWithSources"
-	| "clientIdSync";
+	| "clientIdSync"
+	| "clientIdAck"
+	| "readyForSync"
+	| "dummyEvent"
+	| "eventsBatch";
 
 export interface BaseSyncEvent {
 	type: SyncEventType;
@@ -22,14 +27,24 @@ export interface CreateConversationEvent extends BaseSyncEvent {
 	conversation: Conversation;
 }
 
+export interface CreateConversationBranchEvent extends BaseSyncEvent {
+	type: "createConversationBranch";
+	sourceId: string;
+	branchId: string;
+	messageIndex: number;
+	messageIds?: string[];
+}
+
 export interface AddMessageEvent extends BaseSyncEvent {
 	type: "addMessage";
 	conversationId: string;
+	messageIndex: number;
 	message: ChatMessage;
 }
 
 export interface UpdateMessageEvent extends BaseSyncEvent {
 	type: "updateMessage";
+	messageId: string;
 	messageIndex: number;
 	conversationId: string;
 	message: ChatMessage;
@@ -37,6 +52,7 @@ export interface UpdateMessageEvent extends BaseSyncEvent {
 
 export interface UpdateMessageStreamEvent extends BaseSyncEvent {
 	type: "updateMessageStream";
+	messageId: string;
 	messageIndex: number;
 	conversationId: string;
 	part: string;
@@ -44,23 +60,41 @@ export interface UpdateMessageStreamEvent extends BaseSyncEvent {
 
 export interface UpdateMessageStreamWithSourcesEvent extends BaseSyncEvent {
 	type: "updateMessageStreamWithSources";
+	messageId: string;
 	messageIndex: number;
 	conversationId: string;
 	source: Source;
 }
 
 export interface ClientIdSync extends BaseSyncEvent {
-	type: "clientIdSync";
+	type: "clientIdSync" | "clientIdAck";
 	clientId: string;
 }
 
+export interface DummyEvent extends BaseSyncEvent {
+	type: "dummyEvent";
+}
+
+export interface ReadyForSync extends BaseSyncEvent {
+	type: "readyForSync";
+}
+
+export interface EventsBatch extends BaseSyncEvent {
+	type: "eventsBatch";
+	events: SyncEvent[];
+}
+
 export type SyncEvent =
+	| DummyEvent
 	| CreateConversationEvent
+	| CreateConversationBranchEvent
 	| AddMessageEvent
 	| UpdateMessageEvent
 	| UpdateMessageStreamEvent
 	| UpdateMessageStreamWithSourcesEvent
-	| ClientIdSync;
+	| ClientIdSync
+	| ReadyForSync
+	| EventsBatch;
 
 // Event Handler Types
 type EventHandler<E extends SyncEvent> = (payload: E) => void;
@@ -130,12 +164,6 @@ export class SyncEventManager {
 			);
 		}
 
-		// Create pipe handler
-		const pipeHandler = (event: SyncEvent) => {
-			const transformedEvent = transform ? transform(event) : event;
-			to.send(transformedEvent);
-		};
-
 		// Store pipe configuration
 		this.pipes.push({ from, to, transform });
 	}
@@ -195,6 +223,11 @@ export class SyncEventManager {
 		if (!event.transportId) {
 			console.warn("Event has no transportId", event);
 			return;
+		}
+		if (event.type === "eventsBatch") {
+			for (const batchedEvent of event.events) {
+				this.handleIncomingEvent(batchedEvent);
+			}
 		}
 		const eventHandlers = this.handlers[event.type];
 		if (eventHandlers) {

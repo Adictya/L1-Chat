@@ -50,6 +50,7 @@ chatsListStore.mount();
 // Initialize SyncEventManager
 const syncEventManager = new SyncEventManager();
 const broadcastChannelTransport = new BroadcastChannelTransport(
+	"local-tab-sync",
 	"l1-chat-sync-events",
 );
 syncEventManager.addTransport(broadcastChannelTransport);
@@ -122,6 +123,7 @@ export function createConversation(title: string, noBroadcast?: boolean) {
 		id: conversationId,
 		title,
 		branch: false,
+		branchOf: undefined,
 		generating: false,
 		meta: {
 			tokens: 0,
@@ -148,7 +150,7 @@ export function createConversation(title: string, noBroadcast?: boolean) {
 	}
 
 	console.log(
-		"Conversation created",
+		"Conversation branch created",
 		conversationId,
 		conversationMapStore.state,
 	);
@@ -162,6 +164,72 @@ conversationMapStore.subscribe((state) => {
 conversationsListStore.subscribe((state) => {
 	console.log("Conversation list store changed", state);
 });
+
+export function createConversationBranch(
+	conversationId: string,
+	messageIndex: number,
+	branchId?: string,
+	messageIds?: string[],
+	noBroadcast?: boolean,
+) {
+	const conversation = conversationMapStore.state[conversationId]?.state;
+	if (!conversation) {
+		throw new Error("Conversation not found");
+	}
+	const newConversationId = crypto.randomUUID();
+	const newConversation: Conversation = {
+		id: branchId || newConversationId,
+		title: conversation.title,
+		branch: true,
+		branchOf: conversationId,
+		generating: conversation.generating,
+		meta: conversation.meta,
+		createdAt: conversation.createdAt,
+		updatedAt: conversation.updatedAt,
+	};
+
+	conversationMapStore.setState((prev) => ({
+		...prev,
+		[newConversationId]: new Store(newConversation),
+	}));
+
+	const newMessageIds = messageIds || new Array(messageIndex).fill("").map(() => crypto.randomUUID());
+
+	const newMessages = chatsStore.state[conversationId].state
+		.slice(0, messageIndex)
+		.map(
+			(message, index) =>
+				new Store<ChatMessage>({
+					...message.state,
+					id: newMessageIds[index],
+				}),
+		);
+
+	chatsStore.setState((prev) => ({
+		...prev,
+		[newConversationId]: new Store(newMessages),
+	}));
+
+	if (!noBroadcast) {
+		syncEventManager.emit<"createConversationBranch">({
+			type: "createConversationBranch",
+			branchId: newConversationId,
+			sourceId: conversationId,
+			messageIndex,
+			messageIds: newMessageIds,
+		});
+	}
+
+	console.log(
+		"Conversation branch created",
+		newConversationId,
+		conversationId,
+		conversationMapStore.state,
+	);
+
+	return newConversationId;
+}
+
 
 export function addMessageDirect(conversationId: string, message: ChatMessage) {
 	const chatMessageListStore = chatsStore.state[conversationId];
@@ -192,6 +260,7 @@ export function addMessage(
 	if (!noBroadcast) {
 		syncEventManager.emit<"addMessage">({
 			type: "addMessage",
+			messageIndex: chatMessageListStore.state.length - 1,
 			conversationId,
 			message: fullMessage,
 		});
@@ -201,6 +270,7 @@ export function addMessage(
 }
 
 export function updateMessage(
+	messageId: string,
 	messageIndex: number,
 	conversationId: string,
 	message:
@@ -230,6 +300,7 @@ export function updateMessage(
 	if (!noBroadcast) {
 		syncEventManager.emit<"updateMessage">({
 			type: "updateMessage",
+			messageId,
 			messageIndex,
 			conversationId,
 			message: newMessage,
@@ -238,6 +309,7 @@ export function updateMessage(
 }
 
 export function updateMessageStream(
+	messageId: string,
 	messageIndex: number,
 	conversationId: string,
 	part: string,
@@ -262,6 +334,7 @@ export function updateMessageStream(
 	if (!noBroadcast) {
 		syncEventManager.emit<"updateMessageStream">({
 			type: "updateMessageStream",
+			messageId,
 			messageIndex,
 			conversationId,
 			part,
@@ -270,6 +343,7 @@ export function updateMessageStream(
 }
 
 export function updateMessageStreamWithSources(
+	messageId: string,
 	messageIndex: number,
 	conversationId: string,
 	source: Source,
@@ -293,6 +367,7 @@ export function updateMessageStreamWithSources(
 	if (!noBroadcast) {
 		syncEventManager.emit<"updateMessageStreamWithSources">({
 			type: "updateMessageStreamWithSources",
+			messageId,
 			messageIndex,
 			conversationId,
 			source,
@@ -309,6 +384,17 @@ syncEventManager.on<"createConversation">("createConversation", (eventData) => {
 	createConversationDirect(conversation);
 });
 
+syncEventManager.on<"createConversationBranch">("createConversationBranch", (eventData) => {
+	const { branchId, sourceId, messageIndex, messageIds } = eventData;
+	console.log("[SyncEventManager] Processing createConversationBranch event:", {
+		branchId,
+		sourceId,
+		messageIndex,
+		messageIds,
+	});
+	createConversationBranch(sourceId, messageIndex, branchId, messageIds, true);
+});
+
 syncEventManager.on<"addMessage">("addMessage", (eventData) => {
 	const { conversationId, message } = eventData;
 	console.log("[SyncEventManager] Processing addMessage event:", {
@@ -319,36 +405,37 @@ syncEventManager.on<"addMessage">("addMessage", (eventData) => {
 });
 
 syncEventManager.on<"updateMessage">("updateMessage", (eventData) => {
-	const { messageIndex, conversationId, message } = eventData;
+	const { messageId, messageIndex, conversationId, message } = eventData;
 	console.log("[SyncEventManager] Processing updateMessage event:", {
+		messageId,
 		messageIndex,
 		conversationId,
 		message,
 	});
-	updateMessage(messageIndex, conversationId, message, true);
+	updateMessage(messageId, messageIndex, conversationId, message, true);
 });
 
 syncEventManager.on<"updateMessageStream">(
 	"updateMessageStream",
 	(eventData) => {
-		const { messageIndex, conversationId, part } = eventData;
+		const { messageId, messageIndex, conversationId, part } = eventData;
 		console.log("[SyncEventManager] Processing updateMessageStream event:", {
 			messageIndex,
 			conversationId,
 			part,
 		});
-		updateMessageStream(messageIndex, conversationId, part, true);
+		updateMessageStream(messageId, messageIndex, conversationId, part, true);
 	},
 );
 
 syncEventManager.on<"updateMessageStreamWithSources">(
 	"updateMessageStreamWithSources",
 	(eventData) => {
-		const { messageIndex, conversationId, source } = eventData;
+		const { messageId, messageIndex, conversationId, source } = eventData;
 		console.log(
 			"[SyncEventManager] Processing updateMessageStreamWithSources event:",
-			{ messageIndex, conversationId, source },
+			{ messageId, messageIndex, conversationId, source },
 		);
-		updateMessageStreamWithSources(messageIndex, conversationId, source, true);
+		updateMessageStreamWithSources(messageId, messageIndex, conversationId, source, true);
 	},
 );

@@ -79,7 +79,7 @@ function ChatMessageRenderer({
 			)}
 			{(message.status === "stopped" || message.status === "errored") && (
 				<div
-					key={message.id}
+					key={'error' + message.id}
 					className="bg-destructive/80 p-4 border-destructive-foreground rounded-lg"
 				>
 					{message.status === "stopped"

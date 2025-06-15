@@ -5,8 +5,8 @@ export class BroadcastChannelTransport implements ITransport {
 	id: string;
 	private channel: BroadcastChannel;
 
-	constructor(channelName: string) {
-		this.id = crypto.randomUUID();
+	constructor(id: string, channelName: string) {
+		this.id = id;
 		this.channel = new BroadcastChannel(channelName);
 	}
 

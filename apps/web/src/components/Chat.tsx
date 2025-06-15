@@ -154,27 +154,32 @@ export default function ChatView({ conversationId }: ChatViewProps) {
 					console.log("Recieved chunk", chunk);
 					if (chunk.type === "text-delta") {
 						if (content.length === 0) {
-							updateMessage(msgIndex, convId, {
+							updateMessage(msgId, msgIndex, convId, {
 								status: "generating",
-							})
+							});
 						}
 						content += chunk.textDelta;
-						updateMessageStream(msgIndex, convId, chunk.textDelta);
+						updateMessageStream(msgId, msgIndex, convId, chunk.textDelta);
 					} else if (chunk.type === "source") {
 						if (msgIndex) {
 							sources.push(chunk.source as Source);
-							updateMessageStreamWithSources(msgIndex, convId,chunk.source);
+							updateMessageStreamWithSources(
+								msgId,
+								msgIndex,
+								convId,
+								chunk.source,
+							);
 						}
 					}
 				},
 				async onError() {
-					updateMessage(msgIndex, convId, {
+					updateMessage(msgId, msgIndex, convId, {
 						status: "errored",
 						updatedAt: new Date().toISOString(),
 					});
 				},
 				onFinish({ usage, finishReason }) {
-					updateMessage(msgIndex, convId, {
+					updateMessage(msgId, msgIndex, convId, {
 						status: "done",
 						message: content,
 						updatedAt: new Date().toISOString(),

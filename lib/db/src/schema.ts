@@ -7,6 +7,7 @@ import {
 	text,
 	jsonb,
 } from "drizzle-orm/pg-core";
+import type { SyncEvent } from "l1-sync";
 
 export const account = pgTable(
 	"account",
@@ -26,6 +27,7 @@ export type Conversation = {
 	id: string;
 	title: string;
 	branch: boolean;
+	branchOf?: string;
 	generating: boolean;
 	meta: {
 		tokens: number;
@@ -91,6 +93,21 @@ export const chatMessageTable = pgTable("chat_message", {
 	data: jsonb("data").$type<ChatMessage>().notNull(),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const eventQueueTable = pgTable("event_queue", {
+	id: varchar("id", { length: 255 }).primaryKey(),
+	transportId: varchar("transport_id", { length: 255 }).notNull(),
+	event: jsonb("event").$type<SyncEvent>().notNull(),
+	createdAt: timestamp("created_at").defaultNow().notNull(),
+	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const client_id = pgTable("client_id", {
+	serverTransportId: varchar("server_transport_id", {
+		length: 255,
+	}).primaryKey(),
+	clientId: varchar("clientId", { length: 255 }),
 });
 
 export type MessageEntry = typeof chatMessageTable.$inferSelect;

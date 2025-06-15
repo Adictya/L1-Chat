@@ -10,7 +10,7 @@ import {
 	SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { Link, useLocation, useMatchRoute } from "@tanstack/react-router";
-import { MessageSquare, Settings } from "lucide-react";
+import { GitBranch, MessageSquare, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
 	useSubscribeConversations,
@@ -36,7 +36,7 @@ function ConversationItem({
 					to="/chats/$conversationId"
 					params={{ conversationId: conversation.id.toString() }}
 				>
-					<MessageSquare className="h-4 w-4" />
+					{ conversation.branch ? <GitBranch className="h-4 w-4" /> : <MessageSquare className="h-4 w-4" />}
 					<span>{conversation.title || "Untitled Chat"}</span>
 				</Link>
 			</SidebarMenuButton>
