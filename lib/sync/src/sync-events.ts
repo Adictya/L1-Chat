@@ -1,5 +1,6 @@
 import type { Conversation, ChatMessage, Source } from "l1-db";
 import type { ITransport } from "./transports/transport";
+import type { ModelsEnum, ProvidersEnum } from "./types";
 
 // Core Event Types and Interfaces
 export type SyncEventType =
@@ -15,6 +16,7 @@ export type SyncEventType =
 	| "dummyEvent"
 	| "giveData"
 	| "takeData"
+	| "modelPreferenceUpdated"
 	| "eventsBatch";
 
 export interface BaseSyncEvent {
@@ -105,6 +107,12 @@ export interface DummyEvent extends BaseSyncEvent {
 
 export interface ReadyForSync extends BaseSyncEvent {
 	type: "readyForSync";
+}
+
+export interface ModelPreferenceUpdated extends BaseSyncEvent {
+	type: "modelPreferenceUpdated";
+	model: ModelsEnum;
+	provider: ProvidersEnum;
 }
 
 export interface EventsBatch extends BaseSyncEvent {

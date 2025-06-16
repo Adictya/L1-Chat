@@ -13,6 +13,18 @@ interface UseAutoScrollOptions {
 	messageStore: Store<unknown>;
 }
 
+export const scrollToBottom = (
+	element: HTMLElement,
+	behavior?: ScrollBehavior,
+) => {
+	const targetScrollTop = element.scrollHeight - element.clientHeight;
+
+	element.scrollTo({
+		top: targetScrollTop,
+		behavior: behavior || "smooth",
+	});
+};
+
 export function useAutoScroll(options: UseAutoScrollOptions) {
 	const { offset = 20, smooth = false, messageStore } = options;
 	const scrollRef = useRef<HTMLDivElement>(null);

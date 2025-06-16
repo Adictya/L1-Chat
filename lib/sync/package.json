@@ -2,6 +2,10 @@
   "name": "l1-sync",
   "module": "index.ts",
   "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./types": "./src/types.ts"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },

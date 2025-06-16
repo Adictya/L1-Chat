@@ -1,5 +1,10 @@
 import { Store } from "@tanstack/store";
-import { Providers, type ProvidersEnum } from "./models-store";
+import {
+	Models,
+	Providers,
+	type ModelsEnum,
+	type ProvidersEnum,
+} from "./models-store";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
@@ -62,16 +67,6 @@ export const updateGeminiApiKey = (apiKey: string) => {
 		},
 	}));
 };
-
-export const toggleSearch = () => {
-	settingsStore.setState((state) => {
-		const newState = { ...state };
-		newState.google.config.useSearchGrounding =
-			!newState.google.config.useSearchGrounding;
-		return newState;
-	});
-};
-
 export const updateClaudeApiKey = (apiKey: string) => {
 	settingsStore.setState((state) => ({
 		...state,
@@ -125,6 +120,30 @@ settingsStore.subscribe((state) => {
 
 export const getSettings = () => {
 	return settingsStore.state;
+};
+
+export const toggleSearch = () => {
+	settingsStore.setState((state) => {
+		const newState = { ...state };
+		newState.google.config.useSearchGrounding =
+			!newState.google.config.useSearchGrounding;
+		return newState;
+	});
+};
+
+export const selectedModelPreferencesStore = new Store<{
+	model: ModelsEnum;
+	provider: ProvidersEnum;
+}>({
+	model: Models.Gemini_2_0_Flash,
+	provider: Providers.google,
+});
+
+export const updateSelectedModelPreferences = (
+	model: ModelsEnum,
+	provider: ProvidersEnum,
+) => {
+	selectedModelPreferencesStore.setState({ model, provider });
 };
 
 export default settingsStore;

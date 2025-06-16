@@ -128,13 +128,15 @@ export function useSubscribeConversationMessages(conversationId?: string) {
 		chatMessagesStore || new Store([] as ChatMessageStore[]),
 	);
 
-	console.log("Chat Messages", chatMessages);
+	return chatMessages;
 
-	const chatHistory = useMemo(() => {
-		return chatMessages.map((message) => message.state);
-	}, [chatMessages]);
-
-	return [chatHistory, chatMessages] as const;
+	// console.log("Chat Messages", chatMessages);
+	//
+	// const chatHistory = useMemo(() => {
+	// 	return chatMessages.map((message) => message.state);
+	// }, [chatMessages]);
+	//
+	// return [chatHistory, chatMessages] as const;
 }
 
 export function createConversationDirect(conversation: Conversation) {

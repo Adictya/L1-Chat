@@ -1,8 +1,6 @@
 import { Outlet, createRootRouteWithContext } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
-import { SiteHeader } from "../components/Header";
-
 import TanStackQueryLayout from "../integrations/tanstack-query/layout.tsx";
 
 import type { QueryClient } from "@tanstack/react-query";
@@ -24,7 +22,6 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			<SidebarProvider>
 				<AppSidebar />
 				<SidebarInset>
-					<SiteHeader />
 					<div className="flex-1 flex">
 						<Outlet />
 					</div>
