@@ -32,7 +32,6 @@ export default function ChatView({ conversationId }: ChatViewProps) {
 			</ChatMessageList>
 			<ChatInputBox
 				conversationId={conversationId}
-				chatMessages={chatMessages}
 				scrollRef={scrollRef}
 			/>
 		</div>

@@ -1,8 +1,7 @@
 import {
-	chatsListStore,
-	chatsStore,
 	clearMessages,
 	createConversationBranch,
+	generateResponse,
 	updateMessage,
 	type ChatMessageStore,
 } from "@/integrations/tanstack-store/chats-store";
@@ -13,8 +12,6 @@ import {
 	AccordionItem,
 	AccordionTrigger,
 } from "./ui/accordion";
-import { ChatBubble } from "./ui/chat/chat-bubble";
-import { ChatBubbleMessage } from "./ui/chat/chat-bubble";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CodeHighlight } from "./CodeHighlighter";
@@ -35,10 +32,6 @@ import {
 	X,
 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
-import {
-	generateAnswer,
-	generateAnswerWithPreferredModel,
-} from "@/hooks/use-stream-text";
 
 function ChatMessageRenderer({
 	chatMessageStore,
@@ -61,18 +54,6 @@ function ChatMessageRenderer({
 		}
 	}, [message]);
 
-	const getNewAnswer = (question: string, index: number) => {
-		const messageHistory = chatsStore.state[message.conversationId].state
-			.slice(0, index + 1)
-			.map((message) => message.state);
-
-		generateAnswerWithPreferredModel(
-			question,
-			messageHistory,
-			message.conversationId,
-		);
-	};
-
 	const handleEdit = () => {
 		const input = inputRef.current?.value || "";
 		if (input.trim() === "") {
@@ -90,7 +71,7 @@ function ChatMessageRenderer({
 			inputRef.current.value = "";
 		}
 
-		getNewAnswer(input, messageIndex);
+		generateResponse(message.conversationId);
 	};
 
 	return (
@@ -240,17 +221,12 @@ function ChatMessageRenderer({
 					variant="ghost"
 					size="icon"
 					onClick={() => {
-						const question =
-							message.role === "assistant"
-								? chatsStore.state[message.conversationId].state[messageIndex]
-										.state.message
-								: message.message;
 						const index =
 							message.role === "assistant" ? messageIndex - 1 : messageIndex;
 
 						clearMessages(message.conversationId, index);
 
-						getNewAnswer(question, index);
+						generateResponse(message.conversationId);
 					}}
 				>
 					<RefreshCw />

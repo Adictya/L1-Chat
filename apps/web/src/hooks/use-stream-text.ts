@@ -51,28 +51,13 @@ const getProvider = (providerId: ProvidersEnum) => {
 	return provider.provider as Provider;
 };
 
-export const generateAnswerWithPreferredModel = async (
-	input: string,
-	messageHistory: ChatMessage[],
-	convId: string,
-) => {
-	const selectedModelPreferences = selectedModelPreferencesStore.state;
-
-	return await generateAnswer(
-		input,
-		selectedModelPreferences.model,
-		selectedModelPreferences.provider,
-		messageHistory,
-		convId,
-	);
-};
-
 export const generateAnswer = async (
 	input: string,
+	conversationId: string,
 	selectedModel: ModelsEnum,
 	selectedProvider: ProvidersEnum,
 	messageHistory: ChatMessage[],
-	convId: string,
+	abortSignal?: AbortSignal,
 ) => {
 	try {
 		let content = "";
@@ -95,16 +80,16 @@ export const generateAnswer = async (
 		}
 		const generationConfig = settingsStore.state[selectedProvider].config;
 
-		const [msgId, msgIndex] = addMessage(convId, {
+		const [msgId, msgIndex] = addMessage(conversationId, {
 			role: "assistant",
 			message: content,
-			conversationId: convId,
+			conversationId: conversationId,
 			meta_tokens: 0,
 			status: "submitted",
-			meta_model: selectedModel,
+			meta_model: ModelsInfo[selectedModel].name,
 		});
 
-		updateConversation(convId, {
+		updateConversation(conversationId, {
 			generating: true,
 		});
 
@@ -122,46 +107,47 @@ export const generateAnswer = async (
 				console.log("Recieved chunk", chunk);
 				if (chunk.type === "text-delta") {
 					if (content.length === 0) {
-						updateMessage(msgId, msgIndex, convId, {
+						updateMessage(msgId, msgIndex, conversationId, {
 							status: "generating",
 						});
 					}
 					content += chunk.textDelta;
-					updateMessageStream(msgId, msgIndex, convId, chunk.textDelta);
+					updateMessageStream(msgId, msgIndex, conversationId, chunk.textDelta);
 				} else if (chunk.type === "source") {
 					if (msgIndex) {
 						sources.push(chunk.source as Source);
 						updateMessageStreamWithSources(
 							msgId,
 							msgIndex,
-							convId,
+							conversationId,
 							chunk.source,
 						);
 					}
 				}
 			},
 			async onError() {
-				updateConversation(convId, {
+				updateConversation(conversationId, {
 					generating: false,
 				});
-				updateMessage(msgId, msgIndex, convId, {
+				updateMessage(msgId, msgIndex, conversationId, {
 					status: "errored",
 				});
 			},
 			onFinish({ usage, finishReason }) {
-				updateConversation(convId, {
+				updateConversation(conversationId, {
 					generating: false,
 					meta: {
 						tokens: usage.totalTokens,
 						activeTokens: usage.totalTokens,
 					},
 				});
-				updateMessage(msgId, msgIndex, convId, {
+				updateMessage(msgId, msgIndex, conversationId, {
 					status: "done",
 					message: content,
 					meta_tokens: usage.completionTokens,
 				});
 			},
+			abortSignal,
 			experimental_transform: [smoothStream()],
 		});
 

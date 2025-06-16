@@ -33,10 +33,10 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { generateAnswer } from "@/hooks/use-stream-text";
 import {
 	addMessage,
 	createConversation,
+	generateResponse,
 	type ChatMessageStore,
 } from "@/integrations/tanstack-store/chats-store";
 import { scrollToBottom } from "./ui/chat/hooks/useAutoScroll";
@@ -94,11 +94,9 @@ const IsAtBottomButton = ({
 
 export default function ChatInputBox({
 	conversationId,
-	chatMessages,
 	scrollRef,
 }: {
 	conversationId?: string;
-	chatMessages: ChatMessageStore[];
 	scrollRef: React.RefObject<HTMLDivElement | null>;
 }) {
 	const navigate = useNavigate();
@@ -124,10 +122,7 @@ export default function ChatInputBox({
 			return;
 		}
 
-		const messages = chatMessages.map((message) => message.state);
-
 		const title = input.slice(0, 30) || "New Chat";
-
 		const convId = conversationId || createConversation(title);
 
 		addMessage(convId, {
@@ -143,13 +138,7 @@ export default function ChatInputBox({
 			navigate({ to: `/chats/${convId}` });
 		}
 
-		generateAnswer(
-			input,
-			selectedModelPreferences.model,
-			selectedModelPreferences.provider,
-			messages,
-			convId,
-		);
+		generateResponse(convId);
 	};
 
 	return (

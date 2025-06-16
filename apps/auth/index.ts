@@ -18,7 +18,7 @@ export const GithubUser = z.object({
 	// url: z.string(),
 	// type: z.string(),
 	name: z.string().nullable(),
-	email: z.string().nullable(), // can be null if email is not verified for new users
+	email: z.string().nullable(),
 });
 // https://avatars.githubusercontent.com/u/14136384?v=4
 
@@ -56,6 +56,8 @@ const app = issuer({
 			user = {
 				userId: ghUser.login,
 				username: ghUser.login,
+				name: ghUser.name,
+				email: ghUser.email,
 			};
 		} else {
 			throw new Error("Provider not supported");

@@ -9,9 +9,10 @@
   "dependencies": {
     "@openauthjs/openauth": "^0.4.3",
     "hono": "^4.7.11",
+    "jose": "^6.0.11",
+    "l1-db": "workspace:*",
     "l1-env": "workspace:*",
     "l1-sync": "workspace:*",
-    "l1-db": "workspace:*",
     "nanoid": "^5.1.5"
   },
   "devDependencies": {

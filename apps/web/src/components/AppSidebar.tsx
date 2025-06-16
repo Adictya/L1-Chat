@@ -11,7 +11,7 @@ import {
 	SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Link, useMatchRoute } from "@tanstack/react-router";
-import { GitBranch, MessageSquare, Settings } from "lucide-react";
+import { GitBranch, LogIn, MessageSquare, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
 	useSubscribeConversations,
@@ -20,6 +20,7 @@ import {
 import { useStore } from "@tanstack/react-store";
 import { client } from "@/integrations/openauth/auth";
 import MessageLoading from "./ui/chat/message-loading";
+import { userDataStore } from "@/integrations/tanstack-store/user-data-store";
 
 function ConversationItem({
 	conversationStore,
@@ -59,6 +60,8 @@ export function AppSidebar() {
 	const conversations = useSubscribeConversations();
 	const matchRoute = useMatchRoute();
 
+	const user = useStore(userDataStore);
+
 	const isPathActive = (itemUrl: string, exactMatch = false): boolean => {
 		return !!matchRoute({ to: itemUrl, fuzzy: !exactMatch });
 	};
@@ -89,32 +92,44 @@ export function AppSidebar() {
 					<SidebarSeparator className="max-w-[calc(100%-1rem)]" />
 					<SidebarGroup>
 						<SidebarGroupContent>
-							<SidebarMenu>
-								<SidebarMenuItem>
-									<SidebarMenuButton
-										onClick={async () => {
-											const url = await client.authorize(
-												"http://localhost:3001/auth",
-												"token",
-											);
-											window.location.href = url.url;
-										}}
-									>
-										<Settings className="h-4" />
-										<span>Auth</span>
-									</SidebarMenuButton>
-								</SidebarMenuItem>
-								<SidebarMenuItem>
-									<SidebarMenuButton
-										asChild
-										isActive={isPathActive("/settings")}
-									>
-										<Link to="/settings">
-											<Settings className="h-4" />
-											<span>Settings</span>
-										</Link>
-									</SidebarMenuButton>
-								</SidebarMenuItem>
+							<SidebarMenu className="pb-2">
+								{!user.userId ? (
+									<SidebarMenuItem className="flex flex-row gap-2">
+										<Button
+											onClick={async () => {
+												window.location.href = "http://localhost:3000/login";
+											}}
+											variant="outline"
+											className="flex-1"
+										>
+											<LogIn className="h-4" />
+											<span>Log In</span>
+										</Button>
+										<Button
+											onClick={async () => {
+												window.location.href = "http://localhost:3000/login";
+											}}
+											variant="outline"
+											size="icon"
+											asChild
+										>
+											<Link to="/settings" className="flex flex-row gap-2">
+												<Settings className="h-4" />
+											</Link>
+										</Button>
+									</SidebarMenuItem>
+								) : (
+									<SidebarMenuItem>
+										<SidebarMenuButton
+											asChild
+											isActive={isPathActive("/settings")}
+										>
+											<Link to="/settings" className="flex flex-row gap-2">
+												<span className="text-lg">{user.username}</span>
+											</Link>
+										</SidebarMenuButton>
+									</SidebarMenuItem>
+								)}
 							</SidebarMenu>
 						</SidebarGroupContent>
 					</SidebarGroup>

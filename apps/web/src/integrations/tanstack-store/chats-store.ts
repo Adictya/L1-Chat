@@ -14,7 +14,9 @@ import { useStore } from "@tanstack/react-store";
 import { useMemo } from "react";
 import { SyncEventManager, BroadcastChannelTransport } from "l1-sync";
 import { SimpleWebSocketTransport } from "l1-sync";
-import authStore, { getTokens } from "./auth-store";
+import { generateAnswer } from "@/hooks/use-stream-text";
+import type { ModelsEnum, ProvidersEnum } from "l1-sync/types";
+import { selectedModelPreferencesStore } from "./settings-store";
 
 export type ConversationStore = Store<Conversation>;
 
@@ -49,6 +51,10 @@ export const chatsListStore = new Derived({
 
 chatsListStore.mount();
 
+const stopGenerationStore = new Store<Record<string, AbortController | null>>(
+	{},
+);
+
 // Initialize SyncEventManager
 const syncEventManager = new SyncEventManager();
 
@@ -61,18 +67,7 @@ export const webSocketTransport = new SimpleWebSocketTransport(
 	"ws://localhost:3000",
 );
 syncEventManager.addTransport(webSocketTransport);
-if (authStore.state.access_token) {
-	console.log("Token updated", authStore.state.access_token);
-	webSocketTransport.close();
-	webSocketTransport.connect(authStore.state.access_token);
-}
-authStore.subscribe(({ currentVal }) => {
-	if (currentVal.access_token) {
-		console.log("Token updated", currentVal);
-		webSocketTransport.close();
-		webSocketTransport.connect(currentVal.access_token);
-	}
-});
+webSocketTransport.connect();
 
 // const broadcastChannelTransport = new BroadcastChannelTransport(
 // 	"local-tab-sync",
@@ -126,14 +121,6 @@ export function useSubscribeConversationMessages(conversationId?: string) {
 	);
 
 	return chatMessages;
-
-	// console.log("Chat Messages", chatMessages);
-	//
-	// const chatHistory = useMemo(() => {
-	// 	return chatMessages.map((message) => message.state);
-	// }, [chatMessages]);
-	//
-	// return [chatHistory, chatMessages] as const;
 }
 
 export function createConversationDirect(conversation: Conversation) {
@@ -261,7 +248,7 @@ export function createConversationBranch(
 					...message.state,
 					id: newMessageIds[index],
 					conversationId: newConversationId,
-          updatedAt: Date.now(),
+					updatedAt: Date.now(),
 				}),
 		);
 
@@ -465,6 +452,59 @@ export function clearMessages(
 	}
 }
 
+export function generateResponse(
+	conversationId: string,
+	selectedModel?: ModelsEnum,
+	selectedProvider?: ProvidersEnum,
+) {
+	const messageHistory = chatsStore.state[conversationId].state.map(
+		(message) => message.state,
+	);
+
+	const message = messageHistory
+		.filter((message) => message.role === "user")
+		.at(-1);
+
+	if (!message) {
+		console.warn("No user message found in conversation");
+		return;
+	}
+
+	const abortController = new AbortController();
+
+	stopGenerationStore.setState((prev) => ({
+		...prev,
+		[conversationId]: abortController,
+	}));
+
+	const selectedModelPreferences = selectedModelPreferencesStore.state;
+
+	generateAnswer(
+		message.message,
+		conversationId,
+		selectedModel || selectedModelPreferences.model,
+		selectedProvider || selectedModelPreferences.provider,
+		messageHistory,
+		abortController.signal,
+	);
+}
+
+export function stopGeneration(conversationId: string) {
+	const abortController = stopGenerationStore.state[conversationId];
+
+	if (!abortController) {
+		console.warn("No abort controller found for conversation");
+		return;
+	}
+
+	abortController.abort();
+
+	stopGenerationStore.setState((prev) => ({
+		...prev,
+		[conversationId]: null,
+	}));
+}
+
 // Register event handlers
 syncEventManager.on<"createConversation">("createConversation", (eventData) => {
 	const { conversation } = eventData;
@@ -560,6 +600,28 @@ syncEventManager.on<"clearMessages">("clearMessages", (eventData) => {
 		messageIndex,
 	});
 	clearMessages(conversationId, messageIndex, true);
+});
+
+syncEventManager.on<"generateResponse">("generateResponse", (eventData) => {
+	const { targetClientId, conversationId, selectedModel, selectedProvider } =
+		eventData;
+	console.log("[SyncEventManager] Processing generateResponse event:", {
+		targetClientId,
+		conversationId,
+		selectedModel,
+		selectedProvider,
+	});
+
+	generateResponse(conversationId, selectedModel, selectedProvider);
+});
+
+syncEventManager.on<"stopGeneration">("stopGeneration", (eventData) => {
+	const { conversationId } = eventData;
+	console.log("[SyncEventManager] Processing stopGeneration event:", {
+		conversationId,
+	});
+
+	stopGeneration(conversationId);
 });
 
 // syncEventManager.on<"takeData">("takeData", (eventData) => {

@@ -19,6 +19,8 @@ export type SyncEventType =
 	| "takeData"
 	| "modelPreferenceUpdated"
 	| "eventsBatch"
+	| "generateResponse"
+	| "stopGeneration"
 	| "clearMessages";
 
 export interface BaseSyncEvent {
@@ -134,6 +136,19 @@ export interface ClearMessagesEvent extends BaseSyncEvent {
 	messageIndex: number;
 }
 
+export interface GenerateResponseEvent extends BaseSyncEvent {
+	type: "generateResponse";
+	targetClientId: string;
+	conversationId: string;
+	selectedModel: ModelsEnum;
+	selectedProvider: ProvidersEnum;
+}
+
+export interface StopGenerationEvent extends BaseSyncEvent {
+	type: "stopGeneration";
+	conversationId: string;
+}
+
 export type SyncEvent =
 	| DummyEvent
 	| CreateConversationEvent
@@ -149,7 +164,9 @@ export type SyncEvent =
 	| GiveData
 	| TakeData
 	| EventsBatch
-	| ClearMessagesEvent;
+	| ClearMessagesEvent
+	| GenerateResponseEvent
+	| StopGenerationEvent;
 
 // Event Handler Types
 type EventHandler<E extends SyncEvent> = (payload: E) => void;

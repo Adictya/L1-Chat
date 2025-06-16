@@ -203,7 +203,6 @@ type WebSocketStates = "connecting" | "open" | "closing" | "closed" | "errored";
 export class SimpleWebSocketTransport implements ITransport {
 	id: string;
 	status: Store<WebSocketStates>;
-	private token: string;
 	private url: string;
 	private ws: WebSocket | null = null;
 	private messageHandler: ((event: SyncEvent) => void) | null = null;
@@ -214,9 +213,8 @@ export class SimpleWebSocketTransport implements ITransport {
 		this.status = new Store<WebSocketStates>("closed");
 	}
 
-	connect(token: string) {
-		this.token = token;
-		this.ws = new WebSocket(this.url + "/sync?token=" + token);
+	connect() {
+		this.ws = new WebSocket(this.url + "/sync");
 		this.status.setState("connecting");
 		this.ws.onopen = () => {
 			this.status.setState("open");
@@ -259,7 +257,7 @@ export class SimpleWebSocketTransport implements ITransport {
 			console.warn(
 				"[SimpleWebSocketTransport] WebSocket is errored. Trying to reconnect.",
 			);
-			this.connect(this.token);
+			this.connect();
 		}
 		if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
 			console.warn(

@@ -36,3 +36,4 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 apps/web2/
 .opencode
 apps/server/pg-data
+apps/auth/auth.json
