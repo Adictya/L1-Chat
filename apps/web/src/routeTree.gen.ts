@@ -12,6 +12,7 @@
 
 import { Route as rootRoute } from './routes/__root'
 import { Route as SettingsImport } from './routes/settings'
+import { Route as AuthImport } from './routes/auth'
 import { Route as IndexImport } from './routes/index'
 import { Route as SettingsProfileImport } from './routes/settings.profile'
 import { Route as ChatsConversationIdImport } from './routes/chats/$conversationId'
@@ -21,6 +22,12 @@ import { Route as ChatsConversationIdImport } from './routes/chats/$conversation
 const SettingsRoute = SettingsImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const AuthRoute = AuthImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -51,6 +58,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexImport
+      parentRoute: typeof rootRoute
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthImport
       parentRoute: typeof rootRoute
     }
     '/settings': {
@@ -93,6 +107,7 @@ const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/settings': typeof SettingsRouteWithChildren
   '/chats/$conversationId': typeof ChatsConversationIdRoute
   '/settings/profile': typeof SettingsProfileRoute
@@ -100,6 +115,7 @@ export interface FileRoutesByFullPath {
 
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/settings': typeof SettingsRouteWithChildren
   '/chats/$conversationId': typeof ChatsConversationIdRoute
   '/settings/profile': typeof SettingsProfileRoute
@@ -108,6 +124,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/settings': typeof SettingsRouteWithChildren
   '/chats/$conversationId': typeof ChatsConversationIdRoute
   '/settings/profile': typeof SettingsProfileRoute
@@ -115,12 +132,23 @@ export interface FileRoutesById {
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/settings' | '/chats/$conversationId' | '/settings/profile'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/settings'
+    | '/chats/$conversationId'
+    | '/settings/profile'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/settings' | '/chats/$conversationId' | '/settings/profile'
+  to:
+    | '/'
+    | '/auth'
+    | '/settings'
+    | '/chats/$conversationId'
+    | '/settings/profile'
   id:
     | '__root__'
     | '/'
+    | '/auth'
     | '/settings'
     | '/chats/$conversationId'
     | '/settings/profile'
@@ -129,12 +157,14 @@ export interface FileRouteTypes {
 
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthRoute: typeof AuthRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   ChatsConversationIdRoute: typeof ChatsConversationIdRoute
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthRoute: AuthRoute,
   SettingsRoute: SettingsRouteWithChildren,
   ChatsConversationIdRoute: ChatsConversationIdRoute,
 }
@@ -150,12 +180,16 @@ export const routeTree = rootRoute
       "filePath": "__root.tsx",
       "children": [
         "/",
+        "/auth",
         "/settings",
         "/chats/$conversationId"
       ]
     },
     "/": {
       "filePath": "index.tsx"
+    },
+    "/auth": {
+      "filePath": "auth.tsx"
     },
     "/settings": {
       "filePath": "settings.tsx",

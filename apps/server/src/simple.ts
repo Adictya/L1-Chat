@@ -1,9 +1,9 @@
-import { client_id, eventQueueTable, migrate, setupSyncEvents } from "l1-db";
+import { clientIdTable, eventQueueTable, migrate, setupSyncEvents } from "l1-db";
 import db from "l1-db/local";
 import {
 	getSyncClientEvent,
-	ITransport,
-	SyncEvent,
+	type ITransport,
+	type SyncEvent,
 	SyncEventManager,
 } from "l1-sync";
 import {
@@ -11,6 +11,8 @@ import {
 	getSyncReadyForSyncEvent,
 } from "l1-sync/src/transports/websocket";
 import { nanoid } from "nanoid";
+import { createClient } from "@openauthjs/openauth/client"
+import { subject } from "l1-env";
 
 migrate(db);
 
@@ -20,12 +22,19 @@ class SimpleTransport implements ITransport {
 	private messageHandler: ((event: SyncEvent) => void) | null = null;
 	// Keeping this typo, sendler
 	private messageSendler: ((event: string) => void) | null = null;
+	private userId: string | null = null;
 
-	constructor(id: string) {
+	constructor(id: string, userId: string | null) {
 		this.id = id;
+		this.userId = userId;
+	}
+
+	getUserId() {
+		return this.userId;
 	}
 
 	forward(message: SyncEvent) {
+		message.userId = this.userId ?? undefined;
 		if (this.messageHandler) {
 			message.transportId = this.id;
 			this.messageHandler(message);
@@ -63,7 +72,8 @@ class SimpleTransport implements ITransport {
 
 class ClientOrchestratorTransport extends SimpleTransport {
 	connectedClients = 0;
-	clients: Record<string, SimpleTransport | null> = {};
+	clientTransports: Record<string, SimpleTransport | null> = {};
+	userClients: Record<string, string[]> = {};
 	private enQueueMessageHandler:
 		| ((event: SyncEvent, clientId: string) => void)
 		| null = null;
@@ -71,45 +81,38 @@ class ClientOrchestratorTransport extends SimpleTransport {
 		| ((clientId: string) => Promise<SyncEvent[]> | SyncEvent[])
 		| null = null;
 
-	constructor(id: string, clients: string[]) {
-		super(id);
-		this.clients = clients.reduce(
-			(acc, clientId) => {
-				acc[clientId] = null;
-				return acc;
-			},
-			{} as Record<string, SimpleTransport | null>,
-		);
+	constructor(id: string) {
+		super(id, null);
 	}
 
 	getClientId() {
 		return nanoid();
 	}
 
-	async addClient(clientId: string, transport: SimpleTransport | null) {
+	async addClient(userId: string, clientId: string, transport: SimpleTransport | null) {
 		if (this.connectedClients >= 1) {
 			console.log("[orchestrator] Client not added");
 			return;
 		}
 		if (!transport) {
 			console.log("[orchestrator] Client added but not connected", clientId);
-			this.clients[clientId] = null;
+
 			return;
 		}
-		this.clients[clientId] = transport;
+		this.userClients[userId].push(clientId);
 		transport.send(getSyncClientEvent(clientId));
 		console.log("[orchestrator] Client added:", clientId);
-		const pendingCLientMessages = await this.dequeueMessageHandler?.(clientId);
-		if (pendingCLientMessages) {
-			console.log(
-				"[orchestrator] Sending pending messages",
-				clientId,
-				pendingCLientMessages.length,
-			);
-			for (const message of pendingCLientMessages) {
-				transport.send(message);
-			}
-		}
+		// const pendingCLientMessages = await this.dequeueMessageHandler?.(clientId);
+		// if (pendingCLientMessages) {
+		// 	console.log(
+		// 		"[orchestrator] Sending pending messages",
+		// 		clientId,
+		// 		pendingCLientMessages.length,
+		// 	);
+		// 	for (const message of pendingCLientMessages) {
+		// 		transport.send(message);
+		// 	}
+		// }
 		transport.send(getSyncReadyForSyncEvent());
 		console.log("[orchestrator] Client ready for sync:", clientId);
 		this.connectedClients++;
@@ -124,21 +127,30 @@ class ClientOrchestratorTransport extends SimpleTransport {
 	}
 
 	removeClient(clientId: string) {
-		delete this.clients[clientId];
+		for (const userId in this.userClients) {
+			if (this.userClients[userId].includes(clientId)) {
+				this.userClients[userId] = this.userClients[userId].filter((id) => id !== clientId);
+			}
+		}
+		delete this.clientTransports[clientId];
 	}
 
 	onClientMessage(clientId: string, event: SyncEvent) {
-		console.log(
-			"[orchestrator] Client message:",
-			clientId,
-			!!this.clients[clientId],
-			Object.keys(this.clients),
-		);
-		if (this.clients[clientId]) {
-			for (const otherClientId in this.clients) {
+		if (!event.userId) {
+			console.error("No user id found in event", event);
+			return;
+		}
+		if (this.userClients[event.userId] && this.userClients[event.userId].length > 1) {
+			for (const userClientId of this.userClients[event.userId]) {
+				if (userClientId === clientId) continue;
+				this.clientTransports[userClientId]?.send(event);
+			}
+		}
+		if (this.userClients[event.userId] && this.userClients[event.userId].length === 1) {
+			for (const otherClientId in this.clientTransports) {
 				if (otherClientId === clientId) continue;
-				if (this.clients[otherClientId]) {
-					this.clients[otherClientId].send(event);
+				if (this.clientTransports[otherClientId]) {
+					this.clientTransports[otherClientId].send(event);
 				} else {
 					this.enQueueMessageHandler?.(event, otherClientId);
 				}
@@ -147,11 +159,18 @@ class ClientOrchestratorTransport extends SimpleTransport {
 	}
 
 	send(event: SyncEvent): void {
-		for (const clientId in this.clients) {
-			if (this.clients[clientId]) {
-				this.clients[clientId].send(event);
+		if (!event.userId) {
+			console.error("No user id found in event", event);
+			return;
+		}
+		if (this.userClients[event.userId] && this.userClients[event.userId].length > 1) {
+			for (const clientId of this.userClients[event.userId]) {
+				if (this.clientTransports[clientId]) {
+					this.clientTransports[clientId].send(event);
 			} else {
-				this.enQueueMessageHandler?.(event, clientId);
+					// this.enQueueMessageHandler?.(event, clientId);
+					console.log("Enqueuing message", event);
+				}
 			}
 		}
 	}
@@ -164,18 +183,27 @@ class ClientOrchestratorTransport extends SimpleTransport {
 	}
 }
 
-const clients = await db.select().from(client_id);
-
 const clientOrchestratorTransport = new ClientOrchestratorTransport(
 	"client-orchestrator",
-	clients.map((client) => client.serverTransportId),
 );
 
 const syncEventManager = new SyncEventManager();
 
 syncEventManager.addTransport(clientOrchestratorTransport);
 
+const userClients = await db.select().from(clientIdTable);
+for (const userClient of userClients) {
+	if (userClient.userId) {
+		clientOrchestratorTransport.addClient(userClient.userId, userClient.clientId, null);
+	}
+}
+
 setupSyncEvents(syncEventManager, db);
+
+const client = createClient({
+	clientID: "nextjs",
+	issuer: "http://localhost:3002",
+});
 
 const server = Bun.serve({
 	port: 3000,
@@ -189,23 +217,31 @@ const server = Bun.serve({
 	websocket: {
 		open(ws) {
 			console.log("Connection opened");
+			ws.send(JSON.stringify(getSyncClientEvent(nanoid())))
 		},
-		message(ws, message) {
+		async message(ws, message) {
 			console.log("Message", message);
 			if (typeof message === "string") {
 				const parsedMessage = JSON.parse(message) as SyncEvent;
 				if (parsedMessage.type === "clientIdAck") {
-					const clientTranport = new SimpleTransport(parsedMessage.clientId);
+					const res = await client.verify(subject, parsedMessage.tokens.access_token)
+					if (!res || res.err) {
+						console.log("Token not verified", res);
+						return;
+					}
+					console.log("Token verified", res);
+					const clientTranport = new SimpleTransport(parsedMessage.clientId, res.subject.properties.userId);
 					clientTranport.ready();
 					clientTranport.onSend((event) => {
 						ws.send(event);
 					});
-					db.insert(client_id).values({
-						serverTransportId: parsedMessage.clientId,
-						clientId: clientOrchestratorTransport.id,
-					});
+					await db.insert(clientIdTable).values({
+						userId: res.subject.properties.userId,
+						clientId: parsedMessage.clientId,
+					}).onConflictDoNothing();
 					if (clientOrchestratorTransport.connectedClients < 2) {
 						clientOrchestratorTransport.addClient(
+							res.subject.properties.userId,
 							parsedMessage.clientId,
 							clientTranport,
 						);

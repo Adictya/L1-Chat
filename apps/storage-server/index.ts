@@ -1,11 +1,10 @@
 import { z } from "zod";
 import { issuer } from "@openauthjs/openauth";
-// import { CloudflareStorage } from "@openauthjs/openauth/storage/cloudflare";
 import { MemoryStorage } from "@openauthjs/openauth/storage/memory";
 import { nanoid } from "nanoid";
 
 import { GithubProvider } from "@openauthjs/openauth/provider/github";
-import { subject, User } from "l1-env";
+import { subject, type User } from "l1-env";
 
 const storage = MemoryStorage({});
 

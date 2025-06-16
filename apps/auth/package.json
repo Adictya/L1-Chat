@@ -1,7 +1,7 @@
 {
-  "name": "server",
+  "name": "auth-server",
   "scripts": {
-    "dev": "bun run --hot --no-clear-screen src/index.ts",
+    "dev": "bun run --hot --no-clear-screen index.ts",
     "dev:wrangler": "wrangler dev",
     "deploy": "wrangler deploy --minify",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings"

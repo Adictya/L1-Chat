@@ -5,13 +5,22 @@ import { MemoryStorage } from "@openauthjs/openauth/storage/memory";
 import { nanoid } from "nanoid";
 
 import { GithubProvider } from "@openauthjs/openauth/provider/github";
-import { subject, User } from "l1-env";
+import { subject, type User } from "l1-env";
 
-const storage = MemoryStorage({});
+const storage = MemoryStorage({
+	persist: "./auth.json",
+});
 
 export const GithubUser = z.object({
 	login: z.string(),
+	id: z.number(),
+	// node_id: z.string(),
+	// url: z.string(),
+	// type: z.string(),
+	name: z.string().nullable(),
+	email: z.string().nullable(), // can be null if email is not verified for new users
 });
+// https://avatars.githubusercontent.com/u/14136384?v=4
 
 export type GithubUser = z.infer<typeof GithubUser>;
 
@@ -45,7 +54,7 @@ const app = issuer({
 			console.log(value.tokenset.access);
 			const ghUser = await getGithubUser(value.tokenset.access);
 			user = {
-				userId: nanoid(4),
+				userId: ghUser.login,
 				username: ghUser.login,
 			};
 		} else {
@@ -59,4 +68,7 @@ app.get("/", (c) => {
 	return c.text("Hello Hono!");
 });
 
-export default app;
+export default {
+	fetch: app.fetch,
+	port: 3002,
+};

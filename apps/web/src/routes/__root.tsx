@@ -10,10 +10,11 @@ import { AppSidebar } from "@/components/AppSidebar.tsx";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar.tsx";
 // import type { SyncWorker } from "@/sync/worker.ts";
 // import type { PGliteWorker } from "@electric-sql/pglite/worker";
-import type { PGliteWithLive } from "@electric-sql/pglite/live";
+import type { Client } from "@openauthjs/openauth/client"
 
 interface MyRouterContext {
 	queryClient: QueryClient;
+	authClient: Client
 	// syncWorker: SyncWorker;
 }
 

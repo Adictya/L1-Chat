@@ -9,7 +9,7 @@ import {
 	SidebarMenuItem,
 	SidebarSeparator,
 } from "@/components/ui/sidebar";
-import { Link, useLocation, useMatchRoute } from "@tanstack/react-router";
+import { Link, useLocation, useMatchRoute, useRouteContext } from "@tanstack/react-router";
 import { GitBranch, MessageSquare, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +17,8 @@ import {
 	type ConversationStore,
 } from "@/integrations/tanstack-store/chats-store";
 import { useStore } from "@tanstack/react-store";
+import { useContext } from "react";
+import { client } from "@/integrations/openauth/auth";
 
 function ConversationItem({
 	conversationStore,
@@ -26,6 +28,8 @@ function ConversationItem({
 	const isPathActive = (itemUrl: string, exactMatch = false): boolean => {
 		return !!matchRoute({ to: itemUrl, fuzzy: !exactMatch });
 	};
+
+  console.log("Sidebar Conversation", conversation, conversation.title);
 	return (
 		<SidebarMenuItem>
 			<SidebarMenuButton
@@ -46,8 +50,9 @@ function ConversationItem({
 
 export function AppSidebar() {
 	const conversations = useSubscribeConversations();
-
 	const matchRoute = useMatchRoute();
+
+  console.log("App Sidebar", conversations);
 
 	const isPathActive = (itemUrl: string, exactMatch = false): boolean => {
 		return !!matchRoute({ to: itemUrl, fuzzy: !exactMatch });
@@ -78,11 +83,21 @@ export function AppSidebar() {
 				</div>
 
 				<SidebarSeparator />
-
 				<div>
 					<SidebarGroup>
 						<SidebarGroupContent>
 							<SidebarMenu>
+								<SidebarMenuItem>
+									<SidebarMenuButton
+										onClick={async () => {
+											const url = await client.authorize('http://localhost:3001/auth', "token")
+											window.location.href = url.url
+										}}
+									>
+											<Settings className="h-4 w-4" />
+											<span>Auth</span>
+									</SidebarMenuButton>
+								</SidebarMenuItem>
 								<SidebarMenuItem>
 									<SidebarMenuButton
 										asChild

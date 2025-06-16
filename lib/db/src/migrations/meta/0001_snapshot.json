@@ -1,6 +1,6 @@
 {
-  "id": "790c12ca-1076-425b-a4cc-b3c8e5617bb9",
-  "prevId": "604510ef-044e-4cb6-ac86-256532cca6af",
+  "id": "da93585a-f907-40b9-a425-9bdc0bba1319",
+  "prevId": "0fdb87e1-4a0e-4d93-a6f4-8df4f80b9cbf",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -83,7 +83,13 @@
         "id": {
           "name": "id",
           "type": "varchar(255)",
-          "primaryKey": true,
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "varchar(255)",
+          "primaryKey": false,
           "notNull": true
         },
         "conversation_id": {
@@ -114,21 +120,41 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {
-        "chat_message_conversation_id_conversation_id_fk": {
-          "name": "chat_message_conversation_id_conversation_id_fk",
-          "tableFrom": "chat_message",
-          "tableTo": "conversation",
-          "columnsFrom": [
-            "conversation_id"
-          ],
-          "columnsTo": [
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "chat_message_user_id_conversation_id_id_pk": {
+          "name": "chat_message_user_id_conversation_id_id_pk",
+          "columns": [
+            "user_id",
+            "conversation_id",
             "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          ]
         }
       },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.clients-store": {
+      "name": "clients-store",
+      "schema": "",
+      "columns": {
+        "client_id": {
+          "name": "client_id",
+          "type": "varchar(255)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -142,7 +168,13 @@
         "id": {
           "name": "id",
           "type": "varchar(255)",
-          "primaryKey": true,
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "varchar(255)",
+          "primaryKey": false,
           "notNull": true
         },
         "data": {
@@ -168,7 +200,15 @@
       },
       "indexes": {},
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "conversation_user_id_id_pk": {
+          "name": "conversation_user_id_id_pk",
+          "columns": [
+            "user_id",
+            "id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},

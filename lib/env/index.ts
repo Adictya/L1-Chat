@@ -6,7 +6,7 @@ export const server = {
 };
 
 export const userSchema = z.object({
-	userID: z.string(),
+	userId: z.string(),
 	username: z.string(),
 });
 

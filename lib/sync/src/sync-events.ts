@@ -13,6 +13,8 @@ export type SyncEventType =
 	| "clientIdAck"
 	| "readyForSync"
 	| "dummyEvent"
+	| "giveData"
+	| "takeData"
 	| "eventsBatch";
 
 export interface BaseSyncEvent {
@@ -20,6 +22,7 @@ export interface BaseSyncEvent {
 	timestamp: number;
 	transportId?: string;
 	clientId?: string;
+	userId?: string;
 }
 
 export interface CreateConversationEvent extends BaseSyncEvent {
@@ -66,9 +69,34 @@ export interface UpdateMessageStreamWithSourcesEvent extends BaseSyncEvent {
 	source: Source;
 }
 
-export interface ClientIdSync extends BaseSyncEvent {
-	type: "clientIdSync" | "clientIdAck";
+export interface ClientIdAck extends BaseSyncEvent {
+	type: "clientIdAck";
 	clientId: string;
+	tokens: {
+		access_token: string;
+		refresh_token: string;
+	};
+}
+
+export interface ClientIdSync extends BaseSyncEvent {
+	type: "clientIdSync";
+	clientId: string;
+	tokens: {
+		access_token: string;
+		refresh_token: string;
+	};
+}
+
+export interface GiveData extends BaseSyncEvent {
+	type: "giveData";
+}
+
+export interface TakeData extends BaseSyncEvent {
+	type: "takeData";
+	data: {
+		conversations: Conversation[];
+		messages: ChatMessage[];
+	};
 }
 
 export interface DummyEvent extends BaseSyncEvent {
@@ -93,7 +121,10 @@ export type SyncEvent =
 	| UpdateMessageStreamEvent
 	| UpdateMessageStreamWithSourcesEvent
 	| ClientIdSync
+	| ClientIdAck
 	| ReadyForSync
+	| GiveData
+	| TakeData
 	| EventsBatch;
 
 // Event Handler Types

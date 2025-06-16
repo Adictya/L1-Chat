@@ -1,5 +1,5 @@
 import type { PGliteWorker } from "@electric-sql/pglite/worker";
-import { Derived, Store } from "@tanstack/store";
+import { Derived, Effect, Store } from "@tanstack/store";
 import { asc, eq } from "drizzle-orm";
 import db, {
 	conversation,
@@ -13,6 +13,11 @@ import db, {
 import { useStore } from "@tanstack/react-store";
 import { useMemo } from "react";
 import { SyncEventManager, BroadcastChannelTransport } from "l1-sync";
+import {
+	ClientWebSocketTransport,
+	SimpleWebSocketTransport,
+} from "l1-sync/src/transports/websocket";
+import authStore, { getTokens } from "./auth-store";
 
 export type ConversationStore = Store<Conversation>;
 
@@ -49,11 +54,34 @@ chatsListStore.mount();
 
 // Initialize SyncEventManager
 const syncEventManager = new SyncEventManager();
-const broadcastChannelTransport = new BroadcastChannelTransport(
-	"local-tab-sync",
-	"l1-chat-sync-events",
+
+// const ws = new WebSocket("ws://localhost:3000/chat");
+// const wsTransport = new ClientWebSocketTransport("ws-transport", ws, getTokens());
+// syncEventManager.addTransport(wsTransport);
+
+export const webSocketTransport = new SimpleWebSocketTransport(
+	"ws-transport",
+	"ws://localhost:3000",
 );
-syncEventManager.addTransport(broadcastChannelTransport);
+syncEventManager.addTransport(webSocketTransport);
+if (authStore.state.access_token) {
+	console.log("Token updated", authStore.state.access_token);
+	webSocketTransport.close();
+	webSocketTransport.connect(authStore.state.access_token);
+}
+authStore.subscribe(({ currentVal }) => {
+	if (currentVal.access_token) {
+		console.log("Token updated", currentVal);
+		webSocketTransport.close();
+		webSocketTransport.connect(currentVal.access_token);
+	}
+});
+
+// const broadcastChannelTransport = new BroadcastChannelTransport(
+// 	"local-tab-sync",
+// 	"l1-chat-sync-events",
+// );
+// syncEventManager.addTransport(broadcastChannelTransport);
 
 export async function PopulateConversations(pg: PGliteWorker) {
 	console.log("Populating conversations");
@@ -95,9 +123,12 @@ export function useSubscribeConversationMessages(conversationId?: string) {
 	const chatMessagesStore = useStore(chatsStore, (state) =>
 		conversationId ? state[conversationId] : undefined,
 	);
+	console.log("Chat Messages Store", chatsStore);
 	const chatMessages = useStore(
 		chatMessagesStore || new Store([] as ChatMessageStore[]),
 	);
+
+	console.log("Chat Messages", chatMessages);
 
 	const chatHistory = useMemo(() => {
 		return chatMessages.map((message) => message.state);
@@ -107,6 +138,7 @@ export function useSubscribeConversationMessages(conversationId?: string) {
 }
 
 export function createConversationDirect(conversation: Conversation) {
+	console.log("Creating conversation", conversation);
 	conversationMapStore.setState((prev) => ({
 		...prev,
 		[conversation.id]: new Store(conversation),
@@ -150,7 +182,7 @@ export function createConversation(title: string, noBroadcast?: boolean) {
 	}
 
 	console.log(
-		"Conversation branch created",
+		"Conversation created",
 		conversationId,
 		conversationMapStore.state,
 	);
@@ -193,7 +225,9 @@ export function createConversationBranch(
 		[newConversationId]: new Store(newConversation),
 	}));
 
-	const newMessageIds = messageIds || new Array(messageIndex).fill("").map(() => crypto.randomUUID());
+	const newMessageIds =
+		messageIds ||
+		new Array(messageIndex).fill("").map(() => crypto.randomUUID());
 
 	const newMessages = chatsStore.state[conversationId].state
 		.slice(0, messageIndex)
@@ -230,12 +264,13 @@ export function createConversationBranch(
 	return newConversationId;
 }
 
-
 export function addMessageDirect(conversationId: string, message: ChatMessage) {
+	console.log("Adding message", message);
 	const chatMessageListStore = chatsStore.state[conversationId];
 	if (!chatMessageListStore) {
 		console.log(chatsStore.state);
-		throw new Error("Conversation not found");
+		console.warn("Conversation not found", conversationId);
+		return;
 	}
 	const messageStore = new Store<ChatMessage>(message);
 	chatMessageListStore.setState((prev) => [...prev, messageStore]);
@@ -378,22 +413,31 @@ export function updateMessageStreamWithSources(
 // Register event handlers
 syncEventManager.on<"createConversation">("createConversation", (eventData) => {
 	const { conversation } = eventData;
-	console.log("[SyncEventManager] Processing createConversation event:", {
-		conversation,
-	});
 	createConversationDirect(conversation);
 });
 
-syncEventManager.on<"createConversationBranch">("createConversationBranch", (eventData) => {
-	const { branchId, sourceId, messageIndex, messageIds } = eventData;
-	console.log("[SyncEventManager] Processing createConversationBranch event:", {
-		branchId,
-		sourceId,
-		messageIndex,
-		messageIds,
-	});
-	createConversationBranch(sourceId, messageIndex, branchId, messageIds, true);
-});
+syncEventManager.on<"createConversationBranch">(
+	"createConversationBranch",
+	(eventData) => {
+		const { branchId, sourceId, messageIndex, messageIds } = eventData;
+		console.log(
+			"[SyncEventManager] Processing createConversationBranch event:",
+			{
+				branchId,
+				sourceId,
+				messageIndex,
+				messageIds,
+			},
+		);
+		createConversationBranch(
+			sourceId,
+			messageIndex,
+			branchId,
+			messageIds,
+			true,
+		);
+	},
+);
 
 syncEventManager.on<"addMessage">("addMessage", (eventData) => {
 	const { conversationId, message } = eventData;
@@ -436,6 +480,28 @@ syncEventManager.on<"updateMessageStreamWithSources">(
 			"[SyncEventManager] Processing updateMessageStreamWithSources event:",
 			{ messageId, messageIndex, conversationId, source },
 		);
-		updateMessageStreamWithSources(messageId, messageIndex, conversationId, source, true);
+		updateMessageStreamWithSources(
+			messageId,
+			messageIndex,
+			conversationId,
+			source,
+			true,
+		);
 	},
 );
+
+// syncEventManager.on<"takeData">("takeData", (eventData) => {
+// 	const { data } = eventData;
+// 	const { conversations, messages } = data;
+// 	console.log("[SyncEventManager] Processing takeData event:", {
+// 		conversations,
+// 		messages,
+// 	});
+// 	for (const conversation of conversations) {
+// 		createConversationDirect(conversation);
+// 	}
+// 	for (const message of messages) {
+// 		addMessageDirect(message.conversationId, message);
+// 	}
+// });
+

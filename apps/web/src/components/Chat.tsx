@@ -80,6 +80,8 @@ export default function ChatView({ conversationId }: ChatViewProps) {
 	const [storedMessages, chatMessages] =
 		useSubscribeConversationMessages(conversationId);
 
+  console.log("Chat Messages", storedMessages);
+
 	const searchEnabled = useStore(
 		settingsStore,
 		(store) => store.google.config.useSearchGrounding,

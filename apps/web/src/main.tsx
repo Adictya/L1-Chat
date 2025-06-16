@@ -11,14 +11,16 @@ import { routeTree } from "./routeTree.gen";
 
 import "./styles.css";
 import reportWebVitals from "./reportWebVitals.ts";
-import pg from "./integrations/drizzle-pglite/pglite.ts";
-import { PopulateConversations } from "./integrations/tanstack-store/chats-store.ts";
+// import pg from "./integrations/drizzle-pglite/pglite.ts";
+// import { PopulateConversations } from "./integrations/tanstack-store/chats-store.ts";
+import { AuthProvider, client } from "./integrations/openauth/auth.tsx";
 
 // Create a new router instance
 const router = createRouter({
 	routeTree,
 	context: {
 		...TanStackQueryProvider.getContext(),
+		authClient: client,
 	},
 	defaultPreload: "intent",
 	scrollRestoration: true,
@@ -26,7 +28,7 @@ const router = createRouter({
 	defaultPreloadStaleTime: 0,
 });
 
-await PopulateConversations(pg);
+// await PopulateConversations(pg);
 
 // Register the router instance for type safety
 declare module "@tanstack/react-router" {
@@ -42,7 +44,9 @@ if (rootElement && !rootElement.innerHTML) {
 	root.render(
 		<StrictMode>
 			<TanStackQueryProvider.Provider>
-				<RouterProvider router={router} />
+				<AuthProvider>
+					<RouterProvider router={router} />
+				</AuthProvider>
 			</TanStackQueryProvider.Provider>
 		</StrictMode>,
 	);
