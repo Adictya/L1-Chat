@@ -1,4 +1,11 @@
-import type { ChatMessageStore } from "@/integrations/tanstack-store/chats-store";
+import {
+	chatsListStore,
+	chatsStore,
+	clearMessages,
+	createConversationBranch,
+	updateMessage,
+	type ChatMessageStore,
+} from "@/integrations/tanstack-store/chats-store";
 import { useStore } from "@tanstack/react-store";
 import {
 	Accordion,
@@ -11,7 +18,7 @@ import { ChatBubbleMessage } from "./ui/chat/chat-bubble";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CodeHighlight } from "./CodeHighlighter";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { isAutoScrollEnabled } from "./ChatInputBox";
 import { scrollToBottom } from "./ui/chat/hooks/useAutoScroll";
 import MessageLoading from "./ui/chat/message-loading";
@@ -27,16 +34,25 @@ import {
 	Split,
 	X,
 } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
+import {
+	generateAnswer,
+	generateAnswerWithPreferredModel,
+} from "@/hooks/use-stream-text";
 
 function ChatMessageRenderer({
 	chatMessageStore,
+	messageIndex,
 	scrollRef,
 }: {
 	chatMessageStore: ChatMessageStore;
+	messageIndex: number;
 	scrollRef?: React.RefObject<HTMLDivElement | null>;
 }) {
+	const navigate = useNavigate();
 	const message = useStore(chatMessageStore);
 	const [editting, setEditting] = useState(false);
+	const inputRef = useRef<HTMLTextAreaElement>(null);
 
 	useEffect(() => {
 		if (!scrollRef?.current) return;
@@ -44,6 +60,38 @@ function ChatMessageRenderer({
 			scrollToBottom(scrollRef?.current);
 		}
 	}, [message]);
+
+	const getNewAnswer = (question: string, index: number) => {
+		const messageHistory = chatsStore.state[message.conversationId].state
+			.slice(0, index + 1)
+			.map((message) => message.state);
+
+		generateAnswerWithPreferredModel(
+			question,
+			messageHistory,
+			message.conversationId,
+		);
+	};
+
+	const handleEdit = () => {
+		const input = inputRef.current?.value || "";
+		if (input.trim() === "") {
+			return;
+		}
+
+		updateMessage(message.id, messageIndex, message.conversationId, {
+			message: input,
+		});
+
+		clearMessages(message.conversationId, messageIndex);
+
+		setEditting(false);
+		if (inputRef.current) {
+			inputRef.current.value = "";
+		}
+
+		getNewAnswer(input, messageIndex);
+	};
 
 	return (
 		<div
@@ -64,6 +112,7 @@ function ChatMessageRenderer({
 			>
 				{editting ? (
 					<textarea
+						ref={inputRef}
 						className={cn(
 							"flex-1 min-h-[2.5em] p-2 ring-background focus-visible:outline-none",
 							"bg-sidebar text-primary-foreground rounded-l-lg rounded-tr-lg",
@@ -71,10 +120,15 @@ function ChatMessageRenderer({
 						)}
 						onInput={(e) => {
 							const target = e.target as HTMLTextAreaElement;
-							target.style.height = "auto";
 							target.style.height = `${target.scrollHeight}px`;
 						}}
 						defaultValue={message.message}
+						onKeyDown={(e) => {
+							if (e.key === "Enter" && !e.shiftKey) {
+								e.preventDefault();
+								handleEdit();
+							}
+						}}
 					/>
 				) : (
 					<Markdown
@@ -135,7 +189,17 @@ function ChatMessageRenderer({
 				)}
 			>
 				{message.role === "assistant" ? (
-					<Button variant="ghost" size="icon">
+					<Button
+						variant="ghost"
+						size="icon"
+						onClick={() => {
+							const newConversation = createConversationBranch(
+								message.conversationId,
+								messageIndex,
+							);
+							navigate({ to: `/chats/${newConversation}` });
+						}}
+					>
 						<Split className="rotate-180" />
 					</Button>
 				) : !editting ? (
@@ -154,7 +218,9 @@ function ChatMessageRenderer({
 							variant="ghost"
 							size="icon"
 							onClick={() => {
-								setEditting(!editting);
+								if (inputRef.current) {
+									handleEdit();
+								}
 							}}
 						>
 							<Check />
@@ -170,7 +236,23 @@ function ChatMessageRenderer({
 						</Button>
 					</>
 				)}
-				<Button variant="ghost" size="icon">
+				<Button
+					variant="ghost"
+					size="icon"
+					onClick={() => {
+						const question =
+							message.role === "assistant"
+								? chatsStore.state[message.conversationId].state[messageIndex]
+										.state.message
+								: message.message;
+						const index =
+							message.role === "assistant" ? messageIndex - 1 : messageIndex;
+
+						clearMessages(message.conversationId, index);
+
+						getNewAnswer(question, index);
+					}}
+				>
 					<RefreshCw />
 				</Button>
 				<Button

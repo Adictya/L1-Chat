@@ -5,6 +5,7 @@ import type { ModelsEnum, ProvidersEnum } from "./types";
 // Core Event Types and Interfaces
 export type SyncEventType =
 	| "createConversation"
+	| "updateConversation"
 	| "createConversationBranch"
 	| "addMessage"
 	| "updateMessage"
@@ -17,7 +18,8 @@ export type SyncEventType =
 	| "giveData"
 	| "takeData"
 	| "modelPreferenceUpdated"
-	| "eventsBatch";
+	| "eventsBatch"
+	| "clearMessages";
 
 export interface BaseSyncEvent {
 	type: SyncEventType;
@@ -30,6 +32,12 @@ export interface BaseSyncEvent {
 export interface CreateConversationEvent extends BaseSyncEvent {
 	type: "createConversation";
 	conversation: Conversation;
+}
+
+export interface UpdateConversationEvent extends BaseSyncEvent {
+	type: "updateConversation";
+	conversationId: string;
+	data: Partial<Omit<Conversation, "id">>;
 }
 
 export interface CreateConversationBranchEvent extends BaseSyncEvent {
@@ -120,9 +128,16 @@ export interface EventsBatch extends BaseSyncEvent {
 	events: SyncEvent[];
 }
 
+export interface ClearMessagesEvent extends BaseSyncEvent {
+	type: "clearMessages";
+	conversationId: string;
+	messageIndex: number;
+}
+
 export type SyncEvent =
 	| DummyEvent
 	| CreateConversationEvent
+	| UpdateConversationEvent
 	| CreateConversationBranchEvent
 	| AddMessageEvent
 	| UpdateMessageEvent
@@ -133,7 +148,8 @@ export type SyncEvent =
 	| ReadyForSync
 	| GiveData
 	| TakeData
-	| EventsBatch;
+	| EventsBatch
+	| ClearMessagesEvent;
 
 // Event Handler Types
 type EventHandler<E extends SyncEvent> = (payload: E) => void;

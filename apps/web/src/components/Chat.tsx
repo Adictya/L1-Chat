@@ -21,8 +21,9 @@ export default function ChatView({ conversationId }: ChatViewProps) {
 			>
 				{chatMessages?.map((message, index) => (
 					<ChatMessageRenderer
-						key={message.state.id + crypto.randomUUID()}
+						key={message.state.id}
 						chatMessageStore={message}
+						messageIndex={index}
 						scrollRef={
 							index === chatMessages.length - 1 ? scrollRef : undefined
 						}

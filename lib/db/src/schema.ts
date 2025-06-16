@@ -34,8 +34,8 @@ export type Conversation = {
     tokens: number;
     activeTokens: number;
   };
-  createdAt: string;
-  updatedAt: string;
+  createdAt: number;
+  updatedAt: number;
 };
 
 export const conversation = pgTable(
@@ -74,8 +74,8 @@ export type ChatMessage = {
   conversationId: string;
   message: string;
   disabled?: boolean;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: number;
+  updatedAt: number;
   meta_tokens: number;
   role: "assistant" | "user";
   meta_model?: string;

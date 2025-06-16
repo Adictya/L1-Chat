@@ -23,104 +23,13 @@ import {
 	updateMessage,
 	updateMessageStream,
 	updateMessageStreamWithSources,
+	updateConversation,
 } from "@/integrations/tanstack-store/chats-store";
 import type { ChatMessage, Source } from "l1-db";
 import settingsStore, {
 	getSettings,
+	selectedModelPreferencesStore,
 } from "@/integrations/tanstack-store/settings-store";
-
-type StreamStatus =
-	| "ready"
-	| "submitted"
-	| "reasoning"
-	| "generating"
-	| "error";
-
-interface UseStreamTextOptions {
-	model: LanguageModel;
-	messages: CoreMessage[];
-	system?: string;
-	maxSteps?: number;
-	onChunk?: (
-		chunk: Parameters<
-			StreamTextOnChunkCallback<{ [key: string]: Tool }>
-		>[0]["chunk"],
-	) => void;
-	onError?: (error: unknown) => void;
-	onFinish?: (event: {
-		usage: LanguageModelUsage;
-		finishReason: FinishReason;
-	}) => void;
-}
-
-export function useStreamText() {
-	const [status, setStatus] = useState<StreamStatus>("ready");
-	const abortController = useRef<AbortController | null>(null);
-
-	const stream = async (options: UseStreamTextOptions) => {
-		try {
-			setStatus("submitted");
-
-			abortController.current = new AbortController();
-			console.log(
-				"Abort controller ref",
-				abortController.current,
-				abortController.current.signal,
-			);
-			const result = streamText({
-				...options,
-				onChunk: (param) => {
-					if (param.chunk.type === "reasoning") {
-						setStatus("reasoning");
-					} else if (param.chunk.type === "text-delta") {
-						setStatus("generating");
-					}
-					options.onChunk?.(param.chunk);
-				},
-				onError: (error: { error: unknown }) => {
-					console.log("Error", error);
-					if (
-						error.error instanceof Error &&
-						error.error.name === "AbortError"
-					) {
-						setStatus("ready");
-					}
-					options.onError?.(error);
-					setStatus("error");
-					throw new Error("Generation failed");
-				},
-				onFinish: (event) => {
-					options.onFinish?.(event);
-				},
-				abortSignal: abortController.current.signal,
-				experimental_transform: [smoothStream()],
-			});
-
-			for await (const _ of result.textStream) {
-				// Stream is being consumed
-			}
-			abortController.current = null;
-			setStatus("ready");
-			return result;
-		} catch (error) {
-			setStatus("error");
-			throw error;
-		}
-	};
-
-	const stop = () => {
-		if (abortController.current) {
-			abortController.current.abort();
-			abortController.current = null;
-		}
-	};
-
-	return {
-		stream,
-		status,
-		stop,
-	};
-}
 
 const getPrompt = () => {
 	return `
@@ -142,114 +51,124 @@ const getProvider = (providerId: ProvidersEnum) => {
 	return provider.provider as Provider;
 };
 
-export function useGeneration() {
-	const navigate = useNavigate();
-	const { stream, stop } = useStreamText();
+export const generateAnswerWithPreferredModel = async (
+	input: string,
+	messageHistory: ChatMessage[],
+	convId: string,
+) => {
+	const selectedModelPreferences = selectedModelPreferencesStore.state;
 
-	const onSubmit = async (
-		input: string,
-		selectedModel: ModelsEnum,
-		selectedProvider: ProvidersEnum,
-		messageHistory: ChatMessage[],
-		conversationId?: string,
-	) => {
-		const title = input.slice(0, 30) || "New Chat";
-		const convId = conversationId || createConversation(title);
+	return await generateAnswer(
+		input,
+		selectedModelPreferences.model,
+		selectedModelPreferences.provider,
+		messageHistory,
+		convId,
+	);
+};
 
-		addMessage(convId, {
+export const generateAnswer = async (
+	input: string,
+	selectedModel: ModelsEnum,
+	selectedProvider: ProvidersEnum,
+	messageHistory: ChatMessage[],
+	convId: string,
+) => {
+	try {
+		let content = "";
+		const sources: Source[] = [];
+		const mappedMessages: CoreMessage[] = messageHistory.map((msg) => ({
+			role: msg.role,
+			content: msg.message,
+		}));
+		mappedMessages.push({
 			role: "user",
-			message: input,
-			conversationId: convId,
-			createdAt: new Date().toISOString(),
-			updatedAt: new Date().toISOString(),
-			meta_tokens: 0,
+			content: input,
 		});
 
-		if (!conversationId) {
-			navigate({ to: `/chats/${convId}` });
+		const providerConfig =
+			ModelsInfo[selectedModel].providers[selectedProvider];
+		if (!providerConfig) {
+			throw new Error(
+				`No provider config found for model ${selectedModel} and provider ${selectedProvider}`,
+			);
 		}
+		const generationConfig = settingsStore.state[selectedProvider].config;
 
-		try {
-			let content = "";
-			const sources: Source[] = [];
-			const mappedMessages: CoreMessage[] = messageHistory.map((msg) => ({
-				role: msg.role,
-				content: msg.message,
-			}));
-			mappedMessages.push({
-				role: "user",
-				content: input,
-			});
+		const [msgId, msgIndex] = addMessage(convId, {
+			role: "assistant",
+			message: content,
+			conversationId: convId,
+			meta_tokens: 0,
+			status: "submitted",
+			meta_model: selectedModel,
+		});
 
-			const providerConfig =
-				ModelsInfo[selectedModel].providers[selectedProvider];
-			if (!providerConfig) {
-				throw new Error(
-					`No provider config found for model ${selectedModel} and provider ${selectedProvider}`,
-				);
-			}
-			const generationConfig = settingsStore.state[selectedProvider].config;
+		updateConversation(convId, {
+			generating: true,
+		});
 
-			const [msgId, msgIndex] = addMessage(convId, {
-				role: "assistant",
-				message: content,
-				conversationId: convId,
-				createdAt: new Date().toISOString(),
-				updatedAt: new Date().toISOString(),
-				meta_tokens: 0,
-				status: "submitted",
-			});
-			await stream({
-				model: getProvider(selectedProvider).languageModel(
-					providerConfig.model,
-					generationConfig,
-				),
-				messages: mappedMessages.filter(
-					(msg) => msg.content !== "" && msg.role !== "system",
-				),
-				system: getPrompt(),
-				maxSteps: 2,
-				async onChunk(chunk) {
-					console.log("Recieved chunk", chunk);
-					if (chunk.type === "text-delta") {
-						if (content.length === 0) {
-							updateMessage(msgId, msgIndex, convId, {
-								status: "generating",
-							});
-						}
-						content += chunk.textDelta;
-						updateMessageStream(msgId, msgIndex, convId, chunk.textDelta);
-					} else if (chunk.type === "source") {
-						if (msgIndex) {
-							sources.push(chunk.source as Source);
-							updateMessageStreamWithSources(
-								msgId,
-								msgIndex,
-								convId,
-								chunk.source,
-							);
-						}
+		const result = streamText({
+			model: getProvider(selectedProvider).languageModel(
+				providerConfig.model,
+				generationConfig,
+			),
+			messages: mappedMessages.filter(
+				(msg) => msg.content !== "" && msg.role !== "system",
+			),
+			system: getPrompt(),
+			maxSteps: 2,
+			async onChunk({ chunk }) {
+				console.log("Recieved chunk", chunk);
+				if (chunk.type === "text-delta") {
+					if (content.length === 0) {
+						updateMessage(msgId, msgIndex, convId, {
+							status: "generating",
+						});
 					}
-				},
-				async onError() {
-					updateMessage(msgId, msgIndex, convId, {
-						status: "errored",
-						updatedAt: new Date().toISOString(),
-					});
-				},
-				onFinish({ usage, finishReason }) {
-					updateMessage(msgId, msgIndex, convId, {
-						status: "done",
-						message: content,
-						updatedAt: new Date().toISOString(),
-						meta_tokens: usage.completionTokens,
-					});
-				},
-			});
-		} catch (e) {
-			console.log("Worker error", e);
-		}
-	};
+					content += chunk.textDelta;
+					updateMessageStream(msgId, msgIndex, convId, chunk.textDelta);
+				} else if (chunk.type === "source") {
+					if (msgIndex) {
+						sources.push(chunk.source as Source);
+						updateMessageStreamWithSources(
+							msgId,
+							msgIndex,
+							convId,
+							chunk.source,
+						);
+					}
+				}
+			},
+			async onError() {
+				updateConversation(convId, {
+					generating: false,
+				});
+				updateMessage(msgId, msgIndex, convId, {
+					status: "errored",
+				});
+			},
+			onFinish({ usage, finishReason }) {
+				updateConversation(convId, {
+					generating: false,
+					meta: {
+						tokens: usage.totalTokens,
+						activeTokens: usage.totalTokens,
+					},
+				});
+				updateMessage(msgId, msgIndex, convId, {
+					status: "done",
+					message: content,
+					meta_tokens: usage.completionTokens,
+				});
+			},
+			experimental_transform: [smoothStream()],
+		});
 
-	return onSubmit;
-}
+		for await (const _ of result.textStream) {
+			// Stream is being consumed
+		}
+	} catch (e) {
+		console.log("Worker error", e);
+	}
+};

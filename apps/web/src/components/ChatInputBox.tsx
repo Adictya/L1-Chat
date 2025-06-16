@@ -33,9 +33,14 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { useGeneration } from "@/hooks/use-stream-text";
-import type { ChatMessageStore } from "@/integrations/tanstack-store/chats-store";
+import { generateAnswer } from "@/hooks/use-stream-text";
+import {
+	addMessage,
+	createConversation,
+	type ChatMessageStore,
+} from "@/integrations/tanstack-store/chats-store";
 import { scrollToBottom } from "./ui/chat/hooks/useAutoScroll";
+import { useNavigate } from "@tanstack/react-router";
 
 export const isAutoScrollEnabled = new Store<boolean>(true);
 
@@ -96,6 +101,7 @@ export default function ChatInputBox({
 	chatMessages: ChatMessageStore[];
 	scrollRef: React.RefObject<HTMLDivElement | null>;
 }) {
+	const navigate = useNavigate();
 	const inputRef = useRef<HTMLTextAreaElement>(null);
 
 	const selectedModelPreferences = useStore(selectedModelPreferencesStore);
@@ -105,11 +111,9 @@ export default function ChatInputBox({
 		(store) => store.google.config.useSearchGrounding,
 	);
 
-	const onSubmit = useGeneration();
-
-  useEffect(() => {
-    scrollRef?.current && scrollToBottom(scrollRef.current, "instant");
-  }, [conversationId, scrollRef]);
+	useEffect(() => {
+		scrollRef?.current && scrollToBottom(scrollRef.current, "instant");
+	}, [conversationId, scrollRef]);
 
 	const handleSend = () => {
 		const input = inputRef.current?.value || "";
@@ -121,14 +125,30 @@ export default function ChatInputBox({
 		}
 
 		const messages = chatMessages.map((message) => message.state);
+
+		const title = input.slice(0, 30) || "New Chat";
+
+		const convId = conversationId || createConversation(title);
+
+		addMessage(convId, {
+			role: "user",
+			message: input,
+			conversationId: convId,
+			meta_tokens: 0,
+		});
+
 		scrollRef?.current && scrollToBottom(scrollRef.current, "smooth");
 
-		onSubmit(
+		if (!conversationId) {
+			navigate({ to: `/chats/${convId}` });
+		}
+
+		generateAnswer(
 			input,
 			selectedModelPreferences.model,
 			selectedModelPreferences.provider,
 			messages,
-			conversationId,
+			convId,
 		);
 	};
 

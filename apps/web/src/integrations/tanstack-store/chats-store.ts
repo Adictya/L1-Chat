@@ -13,10 +13,7 @@ import db, {
 import { useStore } from "@tanstack/react-store";
 import { useMemo } from "react";
 import { SyncEventManager, BroadcastChannelTransport } from "l1-sync";
-import {
-	ClientWebSocketTransport,
-	SimpleWebSocketTransport,
-} from "l1-sync/src/transports/websocket";
+import { SimpleWebSocketTransport } from "l1-sync";
 import authStore, { getTokens } from "./auth-store";
 
 export type ConversationStore = Store<Conversation>;
@@ -163,8 +160,8 @@ export function createConversation(title: string, noBroadcast?: boolean) {
 			tokens: 0,
 			activeTokens: 0,
 		},
-		createdAt: new Date().toISOString(),
-		updatedAt: new Date().toISOString(),
+		createdAt: Date.now(),
+		updatedAt: Date.now(),
 	};
 
 	conversationMapStore.setState((prev) => ({
@@ -192,6 +189,31 @@ export function createConversation(title: string, noBroadcast?: boolean) {
 	return conversationId;
 }
 
+export function updateConversation(
+	conversationId: string,
+	data: Partial<Omit<Conversation, "id">>,
+	noBroadcast?: boolean,
+) {
+	const existingConversation = conversationMapStore.state[conversationId];
+	if (!existingConversation) {
+		throw new Error("Conversation not found");
+	}
+	existingConversation.setState((prev) => ({
+		...prev,
+		...data,
+		id: conversationId,
+		updatedAt: Date.now(),
+	}));
+
+	if (!noBroadcast) {
+		syncEventManager.emit<"updateConversation">({
+			type: "updateConversation",
+			conversationId,
+			data: existingConversation.state,
+		});
+	}
+}
+
 conversationMapStore.subscribe((state) => {
 	console.log("Conversation map store changed", state);
 });
@@ -210,21 +232,21 @@ export function createConversationBranch(
 	if (!conversation) {
 		throw new Error("Conversation not found");
 	}
-	const newConversationId = crypto.randomUUID();
+	const newConversationId = branchId || crypto.randomUUID();
 	const newConversation: Conversation = {
-		id: branchId || newConversationId,
+		id: newConversationId,
 		title: conversation.title,
 		branch: true,
 		branchOf: conversationId,
-		generating: conversation.generating,
+		generating: false,
 		meta: conversation.meta,
 		createdAt: conversation.createdAt,
-		updatedAt: conversation.updatedAt,
+		updatedAt: Date.now(),
 	};
 
 	conversationMapStore.setState((prev) => ({
-		...prev,
 		[newConversationId]: new Store(newConversation),
+		...prev,
 	}));
 
 	const newMessageIds =
@@ -232,12 +254,14 @@ export function createConversationBranch(
 		new Array(messageIndex).fill("").map(() => crypto.randomUUID());
 
 	const newMessages = chatsStore.state[conversationId].state
-		.slice(0, messageIndex)
+		.slice(0, messageIndex + 1)
 		.map(
 			(message, index) =>
 				new Store<ChatMessage>({
 					...message.state,
 					id: newMessageIds[index],
+					conversationId: newConversationId,
+          updatedAt: Date.now(),
 				}),
 		);
 
@@ -280,7 +304,7 @@ export function addMessageDirect(conversationId: string, message: ChatMessage) {
 
 export function addMessage(
 	conversationId: string,
-	message: Omit<ChatMessage, "id">,
+	message: Omit<ChatMessage, "id" | "createdAt" | "updatedAt">,
 	noBroadcast?: boolean,
 ) {
 	const id = crypto.randomUUID();
@@ -290,9 +314,16 @@ export function addMessage(
 		throw new Error("Conversation not found");
 	}
 
-	const fullMessage: ChatMessage = { id, ...message };
+	const fullMessage: ChatMessage = {
+		...message,
+		id,
+		createdAt: Date.now(),
+		updatedAt: Date.now(),
+	};
 	const messageStore = new Store<ChatMessage>(fullMessage);
 	chatMessageListStore.setState((prev) => [...prev, messageStore]);
+
+	updateConversation(conversationId, { updatedAt: Date.now() }, noBroadcast);
 
 	if (!noBroadcast) {
 		syncEventManager.emit<"addMessage">({
@@ -330,6 +361,7 @@ export function updateMessage(
 						id: prev.id,
 						conversationId: prev.conversationId,
 						role: prev.role,
+						updatedAt: Date.now(),
 					};
 		return newMessage;
 	});
@@ -412,6 +444,27 @@ export function updateMessageStreamWithSources(
 	}
 }
 
+export function clearMessages(
+	conversationId: string,
+	messageIndex: number,
+	noBroadcast?: boolean,
+) {
+	const chatMessageListStore = chatsStore.state[conversationId];
+	if (!chatMessageListStore) {
+		throw new Error("Conversation not found");
+	}
+
+	chatMessageListStore.setState((prev) => prev.slice(0, messageIndex + 1));
+
+	if (!noBroadcast) {
+		syncEventManager.emit<"clearMessages">({
+			type: "clearMessages",
+			conversationId,
+			messageIndex,
+		});
+	}
+}
+
 // Register event handlers
 syncEventManager.on<"createConversation">("createConversation", (eventData) => {
 	const { conversation } = eventData;
@@ -440,6 +493,14 @@ syncEventManager.on<"createConversationBranch">(
 		);
 	},
 );
+
+syncEventManager.on<"updateConversation">("updateConversation", (eventData) => {
+	const { conversationId, data } = eventData;
+	console.log("[SyncEventManager] Processing updateConversation event:", {
+		data,
+	});
+	updateConversation(conversationId, data, true);
+});
 
 syncEventManager.on<"addMessage">("addMessage", (eventData) => {
 	const { conversationId, message } = eventData;
@@ -492,6 +553,15 @@ syncEventManager.on<"updateMessageStreamWithSources">(
 	},
 );
 
+syncEventManager.on<"clearMessages">("clearMessages", (eventData) => {
+	const { conversationId, messageIndex } = eventData;
+	console.log("[SyncEventManager] Processing clearMessages event:", {
+		conversationId,
+		messageIndex,
+	});
+	clearMessages(conversationId, messageIndex, true);
+});
+
 // syncEventManager.on<"takeData">("takeData", (eventData) => {
 // 	const { data } = eventData;
 // 	const { conversations, messages } = data;
@@ -506,4 +576,3 @@ syncEventManager.on<"updateMessageStreamWithSources">(
 // 		addMessageDirect(message.conversationId, message);
 // 	}
 // });
-

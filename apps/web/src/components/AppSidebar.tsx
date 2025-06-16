@@ -19,6 +19,7 @@ import {
 } from "@/integrations/tanstack-store/chats-store";
 import { useStore } from "@tanstack/react-store";
 import { client } from "@/integrations/openauth/auth";
+import MessageLoading from "./ui/chat/message-loading";
 
 function ConversationItem({
 	conversationStore,
@@ -40,7 +41,14 @@ function ConversationItem({
 					params={{ conversationId: conversation.id.toString() }}
 				>
 					{conversation.branch && <GitBranch className="h-4 w-4" />}
-					<span>{conversation.title || "Untitled Chat"}</span>
+					<span className="truncate">
+						{conversation.title || "Untitled Chat"}
+					</span>
+					{conversation.generating && (
+						<div className="ml-auto scale-75">
+							<MessageLoading />
+						</div>
+					)}
 				</Link>
 			</SidebarMenuButton>
 		</SidebarMenuItem>
