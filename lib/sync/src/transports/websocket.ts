@@ -214,10 +214,11 @@ export class SimpleWebSocketTransport implements ITransport {
 	}
 
 	connect() {
-		this.ws = new WebSocket(this.url + "/sync");
+		this.ws = new WebSocket(this.url + "/api/sync");
 		this.status.setState("connecting");
 		this.ws.onopen = () => {
 			this.status.setState("open");
+			this.ws?.send(JSON.stringify({ type: "giveData" }));
 			console.log("[SimpleWebSocketTransport] Connected");
 		};
 		this.ws.onmessage = (wsevent) => {

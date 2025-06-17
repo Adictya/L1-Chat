@@ -1,8 +1,11 @@
 import * as schema from "./schema";
 import type { ChatMessage } from "./schema";
-import { and, asc, eq } from "drizzle-orm";
-import type { DB } from "./db";
+import { and, asc, desc, eq } from "drizzle-orm";
 import type { SyncEventManager } from "l1-sync";
+import type { DrizzleD1Database } from "drizzle-orm/d1";
+import type { BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
+
+type DB = DrizzleD1Database<typeof schema> | BunSQLiteDatabase<typeof schema>;
 
 export function setupSyncEvents(syncEventManager: SyncEventManager, db: DB) {
 	syncEventManager.on<"createConversation">(
@@ -58,14 +61,8 @@ export function setupSyncEvents(syncEventManager: SyncEventManager, db: DB) {
 			const existingMessages = await db
 				.select()
 				.from(schema.chatMessageTable)
-				.where(
-					and(
-						eq(schema.chatMessageTable.id, message.id),
-						eq(schema.chatMessageTable.conversationId, conversationId),
-						eq(schema.chatMessageTable.userId, userId),
-					),
-				)
-				.limit(0);
+				.where(and(eq(schema.chatMessageTable.id, message.id)))
+				.limit(1);
 
 			const existingMessage =
 				existingMessages.length > 0 ? existingMessages[0] : undefined;
@@ -167,7 +164,21 @@ export function setupSyncEvents(syncEventManager: SyncEventManager, db: DB) {
 				console.error("No user id found");
 				return;
 			}
-			console.log("[DB] Updating conversation:", conversationId);
+			console.log("[DB] Updating conversation:", conversationId, userId);
+			console.log(
+				"[DB] query",
+				db
+					.select()
+					.from(schema.conversation)
+					.where(
+						and(
+							eq(schema.conversation.id, conversationId),
+							eq(schema.conversation.userId, userId),
+						),
+					)
+					.limit(1)
+					.toSQL(),
+			);
 			try {
 				const existingConversations = await db
 					.select()
@@ -232,24 +243,58 @@ export function setupSyncEvents(syncEventManager: SyncEventManager, db: DB) {
 		}
 	});
 
+	// syncEventManager.on<"addAttachment">("addAttachment", async (eventData) => {
+	// 	const { attachment, userId } = eventData;
+	// 	console.log("[DB] Adding attachment:", attachment);
+	// 	if (!userId) {
+	// 		console.error("No user id found");
+	// 		return;
+	// 	}
+	// 	try {
+	// 		await db.insert(schema.attachmentTable).values({
+	// 			id: attachment.id,
+	// 			userId: userId,
+	// 			conversationId: attachment.conversationId,
+	// 			data: attachment.data,
+	// 			fileData: attachment.fileData,
+	// 		});
+	// 		console.log("[DB] Attachment added:", attachment.id);
+	// 	} catch (error) {
+	// 		console.error("Error adding attachment:", error);
+	// 	}
+	// });
+
 	// syncEventManager.on<"giveData">("giveData", async (eventData) => {
-	//   const { userId } = eventData;
-	//   if (!userId) {
-	//     console.error("No user id found")
-	//     return
-	//   }
-	//   const conversations = await db.query.conversation.findMany({
-	//     where: eq(schema.conversation.userId, userId),
-	//   })
-	//   const messages = await db.query.chatMessageTable.findMany({
-	//     where: eq(schema.chatMessageTable.userId, userId),
-	//   })
-	//   syncEventManager.emit<"takeData">({
-	//     type: "takeData",
-	//     data: {
-	//       conversations: conversations.map((c) => c.data),
-	//       messages: messages.map((m) => m.data),
-	//     },
-	//   })
-	// })
+	// 	console.log("[DB] Giving data");
+	// 	const { userId } = eventData;
+	// 	if (!userId) {
+	// 		console.error("No user id found");
+	// 		return;
+	// 	}
+	// 	const conversations = await db
+	// 		.select()
+	// 		.from(schema.conversation)
+	// 		.where(eq(schema.conversation.userId, userId))
+	// 		.orderBy(asc(schema.conversation.updatedAt));
+	// 	const messages = await db
+	// 		.select()
+	// 		.from(schema.chatMessageTable)
+	// 		.where(eq(schema.chatMessageTable.userId, userId))
+	// 		.orderBy(desc(schema.chatMessageTable.createdAt));
+	//
+	// 	const attachments = await db
+	// 		.select()
+	// 		.from(schema.attachmentTable)
+	// 		.where(eq(schema.attachmentTable.userId, userId))
+	// 		.orderBy(asc(schema.attachmentTable.updatedAt));
+	//
+	// 	syncEventManager.emit<"takeData">({
+	// 		type: "takeData",
+	// 		data: {
+	// 			conversations: conversations.map((c) => c.data),
+	// 			messages: messages.map((m) => m.data),
+	// 			attachments: attachments.map((a) => a.data),
+	// 		},
+	// 	});
+	// });
 }

@@ -12,7 +12,9 @@
     "generate-migrations": "bun x drizzle-kit generate && bun run ./scripts/compile-migrations.ts"
   },
   "exports": {
-    ".": "./index.ts"
+    ".": "./index.ts",
+    "./cloudflare": "./cloudflare.ts",
+    "./schema": "./src/schema.ts"
   },
   "peerDependencies": {
     "typescript": "^5"

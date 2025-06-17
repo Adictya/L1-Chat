@@ -28,9 +28,10 @@ import {
 	updateConversation,
 } from "@/integrations/tanstack-store/chats-store";
 import type { ChatMessage, Source } from "l1-db";
-import settingsStore, {
+import {
+	getProviderConfig,
 	getSettings,
-	selectedModelPreferencesStore,
+	type ModelPreference,
 } from "@/integrations/tanstack-store/settings-store";
 import { getFile } from "@/lib/indexed-db";
 import { attachmentsStore } from "@/integrations/tanstack-store/attachments-store";
@@ -60,11 +61,13 @@ export const generateAnswer = async (
 	conversationId: string,
 	selectedModel: ModelsEnum,
 	selectedProvider: ProvidersEnum,
+	settings: ModelPreference,
 	messageHistory: ChatMessage[],
 	abortSignal?: AbortSignal,
 ) => {
 	try {
 		let content = "";
+		let reasoning = "";
 		const sources: Source[] = [];
 		const mappedMessages: (CoreMessage | CoreUserMessage)[] = [];
 		for (const message of messageHistory) {
@@ -91,10 +94,10 @@ export const generateAnswer = async (
 					}
 				}
 			}
-      mappedMessages.push({
-        role: message.role,
-        content: message.message,
-      });
+			mappedMessages.push({
+				role: message.role,
+				content: message.message,
+			});
 		}
 
 		mappedMessages.push({
@@ -109,7 +112,8 @@ export const generateAnswer = async (
 				`No provider config found for model ${selectedModel} and provider ${selectedProvider}`,
 			);
 		}
-		const generationConfig = settingsStore.state[selectedProvider].config;
+
+		const generationConfig = getProviderConfig(selectedProvider, settings);
 
 		const [msgId, msgIndex] = addMessage(conversationId, {
 			role: "assistant",
@@ -127,6 +131,7 @@ export const generateAnswer = async (
 		const result = streamText({
 			model: getProvider(selectedProvider).languageModel(
 				providerConfig.model,
+				// @ts-expect-error
 				generationConfig,
 			),
 			messages: mappedMessages.filter(
@@ -140,10 +145,25 @@ export const generateAnswer = async (
 					if (content.length === 0) {
 						updateMessage(msgId, msgIndex, conversationId, {
 							status: "generating",
+							reasoning: reasoning !== "" ? reasoning : undefined,
 						});
 					}
 					content += chunk.textDelta;
 					updateMessageStream(msgId, msgIndex, conversationId, chunk.textDelta);
+				} else if (chunk.type === "reasoning") {
+					if (reasoning.length === 0) {
+						updateMessage(msgId, msgIndex, conversationId, {
+							status: "reasoning",
+						});
+					}
+					reasoning += chunk.textDelta;
+					updateMessageStream(
+						msgId,
+						msgIndex,
+						conversationId,
+						chunk.textDelta,
+						"reasoning",
+					);
 				} else if (chunk.type === "source") {
 					if (msgIndex) {
 						sources.push(chunk.source as Source);

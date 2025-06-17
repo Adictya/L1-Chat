@@ -37,3 +37,4 @@ apps/web2/
 .opencode
 apps/server/pg-data
 apps/auth/auth.json
+apps/server/sqlite.db

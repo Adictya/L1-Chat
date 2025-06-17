@@ -13,8 +13,10 @@
   "scripts": {
     "dev:web": "cd apps/web && bun run dev",
     "dev:server": "cd apps/server && bun run dev",
+    "dev:server:cf": "cd apps/server && bun run dev:wrangler",
     "dev:auth": "cd apps/auth && bun run dev",
-    "dev": "conc \"npm:dev:web\" \"npm:dev:server\" \"npm:dev:auth\"",
+    "dev": "conc \"npm:dev:web\" \"npm:dev:server\"",
+    "dev:cf": "conc \"npm:dev:web\" \"npm:dev:server:cf\"",
     "dev:au": "conc \"npm:dev:web\" \"npm:dev:auth\""
   },
   "peerDependencies": {

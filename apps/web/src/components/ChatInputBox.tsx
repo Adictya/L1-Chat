@@ -4,6 +4,7 @@ import { Button } from "./ui/button";
 import {
 	ArrowBigUpDash,
 	ArrowDown,
+	Brain,
 	Command,
 	CornerDownLeft,
 	Globe,
@@ -21,7 +22,6 @@ import {
 } from "@/integrations/tanstack-store/models-store";
 import {
 	selectedModelPreferencesStore,
-	toggleSearch,
 	updateSelectedModelPreferences,
 } from "@/integrations/tanstack-store/settings-store";
 import { Store, useStore } from "@tanstack/react-store";
@@ -61,6 +61,7 @@ const IsAtBottomButton = ({
 }: {
 	scrollRef: React.RefObject<HTMLDivElement | null>;
 }) => {
+	// const autoScrollEnabled = useStore(isAutoScrollEnabled);
 	const [isAtBottom, setIsAtBottom] = useState(true);
 
 	useEffect(() => {
@@ -69,9 +70,9 @@ const IsAtBottomButton = ({
 			const distanceToBottom = Math.abs(
 				scrollHeight - scrollTop - clientHeight,
 			);
-			return distanceToBottom <= 20;
+			return distanceToBottom <= 60;
 		};
-		scrollRef?.current?.addEventListener("scroll", (e) => {
+		scrollRef?.current?.addEventListener("scrollend", (e) => {
 			if (!scrollRef?.current) return;
 			if (checkIsAtBottom(scrollRef.current)) {
 				isAutoScrollEnabled.setState(true);
@@ -120,10 +121,10 @@ export default function ChatInputBox({
 		state.filter((attachment) => !attachment.sent),
 	);
 
-	const searchEnabled = useStore(
-		settingsStore,
-		(store) => store.google.config.useSearchGrounding,
-	);
+	const capabilities =
+		ModelsInfo[selectedModelPreferences.model]?.providers[
+			selectedModelPreferences.provider
+		]?.capabilities;
 
 	const uploadAttachmentMutation = useMutation({
 		mutationFn: async ({
@@ -205,12 +206,13 @@ export default function ChatInputBox({
 					new File([file.data], file.name, { type: file.type }),
 				);
 				formData.append("conversationId", convId);
+				formData.append("id", attachment.id);
 
-        // TODO: env
-				const response = await fetch("http://localhost:3000/upload", {
+				// TODO: env
+				const response = await fetch("http://localhost:3000/api/upload", {
 					method: "POST",
 					body: formData,
-          credentials: "include",
+					credentials: "include",
 				});
 
 				if (!response.ok) {
@@ -271,9 +273,13 @@ export default function ChatInputBox({
 
 						const files: File[] = [];
 						for (const item of items) {
-							if (item.kind === 'file') {
+							if (item.kind === "file") {
 								const file = item.getAsFile();
-								if (file && (file.type.startsWith('image/') || file.type === 'application/pdf')) {
+								if (
+									file &&
+									(["image/png", "image/jpg"].includes(file.type) ||
+										file.type === "application/pdf")
+								) {
 									files.push(file);
 								}
 							}
@@ -332,38 +338,88 @@ export default function ChatInputBox({
 							))}
 						</DropdownMenuContent>
 					</DropdownMenu>
-					<Tooltip>
-						<TooltipTrigger
-							asChild
-							className={`${searchEnabled ? "bg-primary" : "bg-card"} flex h-full items-center gap-2 px-2 border-r-2`}
-						>
-							<button type="button" onClick={() => toggleSearch()}>
-								<Globe size={14} />
-							</button>
-						</TooltipTrigger>
-						<TooltipContent className="flex items-center gap-1 text-xs font-bold p-1 bg-muted">
-							<Command size={10} />
-							<ArrowBigUpDash size={14} /> M
-						</TooltipContent>
-					</Tooltip>
-					<div className="flex items-center ml-auto">
-						<input
-							type="file"
-							ref={fileInputRef}
-							onChange={handleFileSelect}
-							accept="image/*,.pdf"
-							multiple
-							className="hidden"
-						/>
+					{capabilities?.reasoning && (
 						<Tooltip>
-							<TooltipTrigger asChild>
+							<TooltipTrigger
+								asChild
+								className="bg-card flex h-full items-center gap-2 px-2 border-r-2 "
+							>
 								<button
 									type="button"
-									onClick={() => fileInputRef.current?.click()}
-									className="flex h-full items-center gap-2 px-2 border-r-2"
+									onClick={() =>
+										updateSelectedModelPreferences(undefined, undefined, {
+											reasoningEffort:
+												selectedModelPreferences.settings.reasoningEffort ===
+												"low"
+													? "medium"
+													: selectedModelPreferences.settings
+																.reasoningEffort === "medium"
+														? "high"
+														: "low",
+										})
+									}
 								>
-									<Paperclip size={14} />
+									<Brain size={14} />
+									{selectedModelPreferences.settings.reasoningEffort
+										?.at(0)
+										?.toLocaleUpperCase()}
+									{selectedModelPreferences.settings.reasoningEffort
+										?.slice(1)
+										.toLowerCase()}
 								</button>
+							</TooltipTrigger>
+							<TooltipContent className="flex items-center gap-1 text-xs font-bold p-1 bg-muted">
+								<Command size={10} />
+								<ArrowBigUpDash size={14} /> M
+							</TooltipContent>
+						</Tooltip>
+					)}
+					{capabilities?.search && (
+						<Tooltip>
+							<TooltipTrigger
+								asChild
+								className={`${selectedModelPreferences.settings.search ? "bg-primary/80" : "bg-card"} flex h-full items-center gap-2 px-2 border-r-2`}
+							>
+								<button
+									type="button"
+									onClick={() =>
+										updateSelectedModelPreferences(undefined, undefined, {
+											search:
+												!selectedModelPreferencesStore.state.settings.search,
+										})
+									}
+								>
+									<Globe size={14} />
+								</button>
+							</TooltipTrigger>
+							<TooltipContent className="flex items-center gap-1 text-xs font-bold p-1 bg-muted">
+								<Command size={10} />
+								<ArrowBigUpDash size={14} /> M
+							</TooltipContent>
+						</Tooltip>
+					)}
+					<div className="flex h-full items-center ml-auto">
+						<Tooltip>
+							<TooltipTrigger
+								asChild
+								className="flex h-full items-center gap-2 px-2 border-l-2"
+							>
+								<div>
+									<input
+										type="file"
+										ref={fileInputRef}
+										onChange={handleFileSelect}
+										accept="image/jpg,image/png,.pdf"
+										multiple
+										className="hidden"
+									/>
+									<button
+										type="button"
+										onClick={() => fileInputRef.current?.click()}
+									>
+										<Paperclip size={14} />
+									</button>
+								</div>
 							</TooltipTrigger>
 							<TooltipContent className="flex items-center gap-1 text-xs font-bold p-1 bg-muted">
 								Attach files
@@ -372,7 +428,7 @@ export default function ChatInputBox({
 						<Tooltip>
 							<TooltipTrigger
 								asChild
-								className="flex h-full items-center gap-2 px-2 border-l-2"
+								className="flex h-full items-center gap-2 px-2 pl-3 border-l-2"
 							>
 								<button type="button" onClick={handleSend}>
 									Send

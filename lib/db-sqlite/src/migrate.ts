@@ -1,17 +1,18 @@
-import type { MigrationConfig } from "drizzle-orm/migrator";
-import type { DB } from "./db";
-import migrations from "../migrations.json";
-import { chatMessageTable, conversation } from "./schema";
+import type { BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
+import * as schema from "./schema";
+import { migrate } from "drizzle-orm/bun-sqlite/migrator";
 
-export async function migrate(db: DB) {
+export async function migrator(
+	db: BunSQLiteDatabase<typeof schema>,
+	folder: string,
+) {
 	console.log("Running migration");
-	// @ts-expect-error: non public APIS
-	await db.dialect.migrate(migrations, db.session, {
-		migrationsTable: "drizzle_migrations",
-	} satisfies Omit<MigrationConfig, "migrationsFolder">);
+	migrate(db, {
+		migrationsFolder: folder,
+	});
 
-	const conversations = await db.select().from(conversation);
-	const chats = await db.select().from(chatMessageTable);
+	const conversations = await db.select().from(schema.conversation);
+	const chats = await db.select().from(schema.chatMessageTable);
 
 	console.log("conversations", conversations);
 	console.log("chats", chats);

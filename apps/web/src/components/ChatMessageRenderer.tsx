@@ -54,18 +54,20 @@ function ChatMessageRenderer({
 	const [editting, setEditting] = useState(false);
 	const inputRef = useRef<HTMLTextAreaElement>(null);
 	const allAttachments = useStore(attachmentsStore) as Attachment[];
-	const messageAttachments = message.attachments
-		? allAttachments.filter((a: Attachment) =>
-				message.attachments?.includes(a.id),
-			)
-		: [];
+	const messageAttachments =
+		message.attachments && message.attachments.length > 0
+			? allAttachments.filter((a: Attachment) => {
+					console.log("Checking attachment", a.id, message.attachments);
+					return message.attachments?.includes(a.id);
+				})
+			: [];
 
 	useEffect(() => {
 		if (!scrollRef?.current) return;
 		if (isAutoScrollEnabled.state) {
 			scrollToBottom(scrollRef?.current);
 		}
-	}, [scrollRef?.current]);
+	}, [message, scrollRef?.current]);
 
 	const handleEdit = () => {
 		const input = inputRef.current?.value || "";
@@ -96,6 +98,29 @@ function ChatMessageRenderer({
 					(!editting ? "max-w-[60%] ml-auto" : "w-[60%] ml-auto"),
 			)}
 		>
+			{(message.status === "reasoning" ||
+				(message.reasoningParts && message.reasoningParts.length > 0) ||
+				(message.reasoning && message.reasoning.length > 0)) && (
+				<Accordion type="single" collapsible className="mt-4">
+					<AccordionItem value="sources">
+						<AccordionTrigger className="text-sm font-medium">
+							Reasoning
+						</AccordionTrigger>
+						<AccordionContent className="bg-muted p-2 mb-2 rounded-sm prose max-w-none dark:prose-invert prose-pre:m-0 prose-pre:bg-transparent prose-pre:p-0">
+							<Markdown
+								remarkPlugins={[remarkGfm]}
+								components={{
+									code: CodeHighlight,
+								}}
+							>
+								{message.status === "reasoning"
+									? message.reasoningParts?.join("")
+									: message.reasoning}
+							</Markdown>
+						</AccordionContent>
+					</AccordionItem>
+				</Accordion>
+			)}
 			<div
 				className={cn(
 					message.role === "user" &&
@@ -131,7 +156,7 @@ function ChatMessageRenderer({
 						}}
 					/>
 				) : (
-					<div className="prose prose-lg prose-pink max-w-none dark:prose-invert prose-pre:m-0 prose-pre:bg-transparent prose-pre:p-0">
+					<div className="prose prose-lg max-w-none dark:prose-invert prose-pre:m-0 prose-pre:bg-transparent prose-pre:p-0">
 						<Markdown
 							remarkPlugins={[remarkGfm]}
 							components={{
@@ -145,125 +170,131 @@ function ChatMessageRenderer({
 					</div>
 				)}
 			</div>
-			{message.sources && message.sources.length > 0 && (
-				<Accordion type="single" collapsible className="mt-4">
-					<AccordionItem value="sources">
-						<AccordionTrigger className="text-sm font-medium">
-							Sources
-						</AccordionTrigger>
-						<AccordionContent>
-							<div className="space-y-2">
-								{message.sources.map((source, index) => (
-									<div key={`${index}-${source.url}`} className="text-sm">
-										<a
-											href={source.url}
-											target="_blank"
-											rel="noopener noreferrer"
-											className="text-primary hover:underline"
-										>
-											{source.title}
-										</a>
-									</div>
-								))}
-							</div>
-						</AccordionContent>
-					</AccordionItem>
-				</Accordion>
-			)}
 			{message.role === "assistant" &&
-				(message.status === "submitted" ||
-					(message.status === "generating" && message.parts?.length === 0)) && (
-					<MessageLoading />
-				)}
-			{(message.status === "stopped" || message.status === "errored") && (
-				<div
-					key={`error-${message.id}`}
-					className="bg-destructive/80 p-4 border-destructive-foreground rounded-lg"
-				>
-					{message.status === "stopped"
-						? "Stopped by user"
-						: `Error in generation ${message.error}`}
-				</div>
+			(message.status === "submitted" ||
+				message.status === "generating" ||
+				message.status === "reasoning") ? (
+				<MessageLoading />
+			) : (
+				<>
+					{message.sources && message.sources.length > 0 && (
+						<Accordion type="single" collapsible className="mt-4">
+							<AccordionItem value="sources">
+								<AccordionTrigger className="text-sm font-medium">
+									Sources
+								</AccordionTrigger>
+								<AccordionContent>
+									<div className="space-y-2">
+										{message.sources.map((source, index) => (
+											<div key={`${index}-${source.url}`} className="text-sm">
+												<a
+													href={source.url}
+													target="_blank"
+													rel="noopener noreferrer"
+													className="text-primary hover:underline"
+												>
+													{source.title}
+												</a>
+											</div>
+										))}
+									</div>
+								</AccordionContent>
+							</AccordionItem>
+						</Accordion>
+					)}
+					{(message.status === "stopped" || message.status === "errored") && (
+						<div
+							key={`error-${message.id}`}
+							className="bg-destructive/80 p-4 border-destructive-foreground rounded-lg"
+						>
+							{message.status === "stopped"
+								? "Stopped by user"
+								: `Error in generation ${message.error}`}
+						</div>
+					)}
+					<div
+						className={cn(
+							"invisible group-hover:visible flex items-center gap-1 pt-2 text-xs",
+							message.role === "user" && "justify-end",
+						)}
+					>
+						{message.role === "assistant" ? (
+							<Button
+								variant="ghost"
+								size="icon"
+								onClick={() => {
+									const newConversation = createConversationBranch(
+										message.conversationId,
+										messageIndex,
+									);
+									navigate({ to: `/chats/${newConversation}` });
+								}}
+							>
+								<Split className="rotate-180" />
+							</Button>
+						) : !editting ? (
+							<Button
+								variant="ghost"
+								size="icon"
+								onClick={() => {
+									setEditting(true);
+								}}
+							>
+								<Edit />
+							</Button>
+						) : (
+							<>
+								<Button
+									variant="ghost"
+									size="icon"
+									onClick={() => {
+										if (inputRef.current) {
+											handleEdit();
+										}
+									}}
+								>
+									<Check />
+								</Button>
+								<Button
+									variant="ghost"
+									size="icon"
+									onClick={() => {
+										setEditting(false);
+									}}
+								>
+									<X />
+								</Button>
+							</>
+						)}
+						<Button
+							variant="ghost"
+							size="icon"
+							onClick={() => {
+								const index =
+									message.role === "assistant"
+										? messageIndex - 1
+										: messageIndex;
+
+								clearMessages(message.conversationId, index);
+
+								generateResponse(message.conversationId);
+							}}
+						>
+							<RefreshCw />
+						</Button>
+						<Button
+							variant="ghost"
+							size="icon"
+							onClick={() => navigator.clipboard.writeText(message.message)}
+						>
+							<Copy className="rotate-180" />
+						</Button>
+						{message.meta_model && (
+							<span>{message.meta_model || "Gemini 2.0 Flash"}</span>
+						)}
+					</div>
+				</>
 			)}
-			<div
-				className={cn(
-					"invisible group-hover:visible flex items-center gap-1 pt-2 text-xs",
-					message.role === "user" && "justify-end",
-				)}
-			>
-				{message.role === "assistant" ? (
-					<Button
-						variant="ghost"
-						size="icon"
-						onClick={() => {
-							const newConversation = createConversationBranch(
-								message.conversationId,
-								messageIndex,
-							);
-							navigate({ to: `/chats/${newConversation}` });
-						}}
-					>
-						<Split className="rotate-180" />
-					</Button>
-				) : !editting ? (
-					<Button
-						variant="ghost"
-						size="icon"
-						onClick={() => {
-							setEditting(true);
-						}}
-					>
-						<Edit />
-					</Button>
-				) : (
-					<>
-						<Button
-							variant="ghost"
-							size="icon"
-							onClick={() => {
-								if (inputRef.current) {
-									handleEdit();
-								}
-							}}
-						>
-							<Check />
-						</Button>
-						<Button
-							variant="ghost"
-							size="icon"
-							onClick={() => {
-								setEditting(false);
-							}}
-						>
-							<X />
-						</Button>
-					</>
-				)}
-				<Button
-					variant="ghost"
-					size="icon"
-					onClick={() => {
-						const index =
-							message.role === "assistant" ? messageIndex - 1 : messageIndex;
-
-						clearMessages(message.conversationId, index);
-
-						generateResponse(message.conversationId);
-					}}
-				>
-					<RefreshCw />
-				</Button>
-				<Button
-					variant="ghost"
-					size="icon"
-					onClick={() => navigator.clipboard.writeText(message.message)}
-				>
-					<Copy className="rotate-180" />
-				</Button>
-				{message.meta_model && (
-					<span>{message.meta_model || "Gemini 2.0 Flash"}</span>
-				)}
-			</div>
 		</div>
 	);
 }

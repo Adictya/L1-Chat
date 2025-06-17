@@ -1,6 +1,6 @@
 import type { PGliteWorker } from "@electric-sql/pglite/worker";
 import { Derived, Effect, Store } from "@tanstack/store";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, not } from "drizzle-orm";
 import db, {
 	conversation,
 	type ConversationEntry,
@@ -16,7 +16,13 @@ import { SyncEventManager, BroadcastChannelTransport } from "l1-sync";
 import { SimpleWebSocketTransport } from "l1-sync";
 import { generateAnswer } from "@/hooks/use-stream-text";
 import type { ModelsEnum, ProvidersEnum } from "l1-sync/types";
-import { selectedModelPreferencesStore } from "./settings-store";
+import {
+	selectedModelPreferencesStore,
+	type ModelPreference,
+} from "./settings-store";
+import { getFile } from "@/lib/indexed-db";
+import type { CoreMessage } from "ai";
+import { addAttachment, removeAttachment } from "./attachments-store";
 
 export type ConversationStore = Store<Conversation>;
 
@@ -56,7 +62,7 @@ const stopGenerationStore = new Store<Record<string, AbortController | null>>(
 );
 
 // Initialize SyncEventManager
-const syncEventManager = new SyncEventManager();
+export const syncEventManager = new SyncEventManager();
 
 // const ws = new WebSocket("ws://localhost:3000/chat");
 // const wsTransport = new ClientWebSocketTransport("ws-transport", ws, getTokens());
@@ -369,6 +375,7 @@ export function updateMessageStream(
 	messageIndex: number,
 	conversationId: string,
 	part: string,
+	streamType?: "text" | "reasoning",
 	noBroadcast?: boolean,
 ) {
 	const existingMessage = chatsStore.state[conversationId]?.state[messageIndex];
@@ -382,7 +389,9 @@ export function updateMessageStream(
 			? ({
 					...prev,
 					role: "assistant",
-					parts: [...(prev.parts || []), part],
+					...(streamType === "reasoning"
+						? { reasoningParts: [...(prev.reasoningParts || []), part] }
+						: { parts: [...(prev.parts || []), part] }),
 				} as ChatMessage)
 			: prev,
 	);
@@ -452,10 +461,11 @@ export function clearMessages(
 	}
 }
 
-export function generateResponse(
+export async function generateResponse(
 	conversationId: string,
 	selectedModel?: ModelsEnum,
 	selectedProvider?: ProvidersEnum,
+	selectedSettings?: ModelPreference,
 ) {
 	const messageHistory = chatsStore.state[conversationId].state.map(
 		(message) => message.state,
@@ -484,6 +494,7 @@ export function generateResponse(
 		conversationId,
 		selectedModel || selectedModelPreferences.model,
 		selectedProvider || selectedModelPreferences.provider,
+		selectedSettings || selectedModelPreferences.settings,
 		messageHistory,
 		abortController.signal,
 	);
@@ -506,6 +517,25 @@ export function stopGeneration(conversationId: string) {
 }
 
 // Register event handlers
+
+syncEventManager.on("takeData", (eventData) => {
+	const { data } = eventData;
+	for (const conversation of data.conversations.sort(
+		(a, b) => a.updatedAt - b.updatedAt,
+	)) {
+		createConversationDirect(conversation);
+	}
+
+	for (const message of data.messages.sort(
+		(a, b) => a.createdAt - b.createdAt,
+	)) {
+		addMessageDirect(message.conversationId, message);
+	}
+
+	for (const attachment of data.attachments.filter((e) => e.sent))
+		addAttachment(attachment);
+});
+
 syncEventManager.on<"createConversation">("createConversation", (eventData) => {
 	const { conversation } = eventData;
 	createConversationDirect(conversation);
@@ -565,13 +595,21 @@ syncEventManager.on<"updateMessage">("updateMessage", (eventData) => {
 syncEventManager.on<"updateMessageStream">(
 	"updateMessageStream",
 	(eventData) => {
-		const { messageId, messageIndex, conversationId, part } = eventData;
+		const { messageId, messageIndex, conversationId, part, streamType } =
+			eventData;
 		console.log("[SyncEventManager] Processing updateMessageStream event:", {
 			messageIndex,
 			conversationId,
 			part,
 		});
-		updateMessageStream(messageId, messageIndex, conversationId, part, true);
+		updateMessageStream(
+			messageId,
+			messageIndex,
+			conversationId,
+			part,
+			streamType,
+			true,
+		);
 	},
 );
 
@@ -624,17 +662,29 @@ syncEventManager.on<"stopGeneration">("stopGeneration", (eventData) => {
 	stopGeneration(conversationId);
 });
 
-// syncEventManager.on<"takeData">("takeData", (eventData) => {
-// 	const { data } = eventData;
-// 	const { conversations, messages } = data;
-// 	console.log("[SyncEventManager] Processing takeData event:", {
-// 		conversations,
-// 		messages,
+syncEventManager.on<"addAttachment">("addAttachment", (eventData) => {
+	const { attachment } = eventData;
+	console.log("[SyncEventManager] Processing addAttachment event:", {
+		attachment,
+	});
+
+	addAttachment(attachment, true);
+});
+
+syncEventManager.on<"removeAttachment">("removeAttachment", (eventData) => {
+	const { id } = eventData;
+	console.log("[SyncEventManager] Processing removeAttachment event:", {
+		id,
+	});
+
+	removeAttachment(id, true);
+});
+
+// syncEventManager.on("", (eventData) => {
+// 	const { conversationId } = eventData;
+// 	console.log("[SyncEventManager] Processing stopGeneration event:", {
+// 		conversationId,
 // 	});
-// 	for (const conversation of conversations) {
-// 		createConversationDirect(conversation);
-// 	}
-// 	for (const message of messages) {
-// 		addMessageDirect(message.conversationId, message);
-// 	}
+//
+// 	stopGeneration(conversationId);
 // });

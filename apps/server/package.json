@@ -2,12 +2,13 @@
   "name": "server",
   "scripts": {
     "dev": "bun run --hot --no-clear-screen src/index.ts",
-    "dev:wrangler": "wrangler dev",
+    "dev:wrangler": "wrangler dev --port 3000",
     "deploy": "wrangler deploy --minify",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings"
   },
   "dependencies": {
     "@openauthjs/openauth": "^0.4.3",
+    "drizzle-orm": "^0.44.2",
     "hono": "^4.7.11",
     "jose": "^6.0.11",
     "l1-db": "workspace:*",

@@ -1,4 +1,4 @@
-import type { Conversation, ChatMessage, Source } from "l1-db";
+import type { Conversation, ChatMessage, Source, Attachment } from "l1-db";
 import type { ITransport } from "./transports/transport";
 import type { ModelsEnum, ProvidersEnum } from "./types";
 
@@ -21,6 +21,8 @@ export type SyncEventType =
 	| "eventsBatch"
 	| "generateResponse"
 	| "stopGeneration"
+	| "addAttachment"
+	| "removeAttachment"
 	| "clearMessages";
 
 export interface BaseSyncEvent {
@@ -70,6 +72,7 @@ export interface UpdateMessageStreamEvent extends BaseSyncEvent {
 	messageId: string;
 	messageIndex: number;
 	conversationId: string;
+	streamType?: "text" | "reasoning";
 	part: string;
 }
 
@@ -108,6 +111,7 @@ export interface TakeData extends BaseSyncEvent {
 	data: {
 		conversations: Conversation[];
 		messages: ChatMessage[];
+		attachments: Attachment[];
 	};
 }
 
@@ -149,6 +153,16 @@ export interface StopGenerationEvent extends BaseSyncEvent {
 	conversationId: string;
 }
 
+export interface AddAttachmentEvent extends BaseSyncEvent {
+	type: "addAttachment";
+	attachment: Attachment;
+}
+
+export interface RemoveAttachmentEvent extends BaseSyncEvent {
+	type: "removeAttachment";
+	id: string;
+}
+
 export type SyncEvent =
 	| DummyEvent
 	| CreateConversationEvent
@@ -166,6 +180,8 @@ export type SyncEvent =
 	| EventsBatch
 	| ClearMessagesEvent
 	| GenerateResponseEvent
+	| AddAttachmentEvent
+	| RemoveAttachmentEvent
 	| StopGenerationEvent;
 
 // Event Handler Types

@@ -30,9 +30,16 @@ export const ProvidersInfo = {
 	},
 } as const satisfies Record<ProvidersEnum, ProviderInfo>;
 
+type Capabilities = {
+	search?: boolean;
+	reasoning?: boolean;
+	disableableReasoning?: boolean;
+};
+
 export interface ModelProviderConfig {
 	provider: ProvidersEnum;
 	model: string;
+	capabilities: Capabilities;
 }
 
 export interface ModelConfig {
@@ -49,6 +56,9 @@ export const ModelsInfo: Record<ModelsEnum, ModelConfig> = {
 			[Providers.google]: {
 				provider: Providers.google,
 				model: "gemini-2.0-flash",
+				capabilities: {
+					search: true,
+				},
 			},
 		},
 	},
@@ -59,6 +69,11 @@ export const ModelsInfo: Record<ModelsEnum, ModelConfig> = {
 			[Providers.google]: {
 				provider: Providers.google,
 				model: "gemini-2.5-flash-preview-05-20",
+				capabilities: {
+					search: true,
+					reasoning: true,
+					disableableReasoning: true,
+				},
 			},
 		},
 	},
@@ -69,10 +84,17 @@ export const ModelsInfo: Record<ModelsEnum, ModelConfig> = {
 			[Providers.google]: {
 				provider: Providers.google,
 				model: "gemini-2.5-pro-preview-06-05",
+				capabilities: {
+					search: true,
+					reasoning: true,
+				},
 			},
 			[Providers.openrouter]: {
 				provider: Providers.openrouter,
 				model: "google/gemini-2.5-pro-preview",
+				capabilities: {
+					reasoning: true,
+				},
 			},
 		},
 	},
@@ -83,6 +105,9 @@ export const ModelsInfo: Record<ModelsEnum, ModelConfig> = {
 			[Providers.anthropic]: {
 				provider: Providers.anthropic,
 				model: "claude-3-5-sonnet-latest",
+				capabilities: {
+					reasoning: true,
+				},
 			},
 		},
 	},

@@ -1,61 +1,13 @@
-import { z } from "zod";
-import { issuer } from "@openauthjs/openauth";
 import { MemoryStorage } from "@openauthjs/openauth/storage/memory";
-import { nanoid } from "nanoid";
+import getApp from "./src/app.ts";
 
-import { GithubProvider } from "@openauthjs/openauth/provider/github";
-import { subject, type User } from "l1-env";
-
-const storage = MemoryStorage({});
-
-export const GithubUser = z.object({
-	login: z.string(),
+const storage = MemoryStorage({
+	persist: "./auth.json",
 });
 
-export type GithubUser = z.infer<typeof GithubUser>;
+const app = getApp(storage);
 
-const getGithubUser = async (access_token: string) => {
-	const userInfoResponse = await fetch("https://api.github.com/user", {
-		method: "GET",
-		headers: {
-			Accept: "application/json",
-			Authorization: `Bearer ${access_token}`,
-		},
-	}).then((res) => res.json());
-
-	const parsedUserResponse = GithubUser.parse(userInfoResponse);
-
-	return parsedUserResponse;
+export default {
+	fetch: app.fetch,
+	port: 3002,
 };
-
-const app = issuer({
-	storage,
-	providers: {
-		github: GithubProvider({
-			clientID: process.env.GITHUB_CLIENT_ID!,
-			clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-			scopes: ["user:email"],
-		}),
-	},
-	subjects: subject,
-	async success(ctx, value) {
-		let user: User;
-		if (value.provider === "github") {
-			console.log(value.tokenset.access);
-			const ghUser = await getGithubUser(value.tokenset.access);
-			user = {
-				userId: nanoid(4),
-				username: ghUser.login,
-			};
-		} else {
-			throw new Error("Provider not supported");
-		}
-		return ctx.subject("user", user);
-	},
-});
-
-app.get("/", (c) => {
-	return c.text("Hello Hono!");
-});
-
-export default app;

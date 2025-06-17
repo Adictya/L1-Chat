@@ -81,6 +81,7 @@ export type ChatMessage = {
   meta_model?: string;
   meta_provider?: string;
   reasoning?: string;
+  reasoningParts?: string[];
   sources?: Source[];
   parts?: string[];
   attachments?: string[];
@@ -131,6 +132,7 @@ export type Attachment = {
   id: string;
   name: string;
   type: string;
+  sent: boolean;
   timestamp: number;
 };
 
