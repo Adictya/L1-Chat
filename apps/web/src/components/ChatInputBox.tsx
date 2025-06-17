@@ -7,6 +7,7 @@ import {
 	Command,
 	CornerDownLeft,
 	Globe,
+	Paperclip,
 	Send,
 	Square,
 } from "lucide-react";
@@ -41,6 +42,17 @@ import {
 } from "@/integrations/tanstack-store/chats-store";
 import { scrollToBottom } from "./ui/chat/hooks/useAutoScroll";
 import { useNavigate } from "@tanstack/react-router";
+import {
+	attachmentsStore,
+	addAttachment,
+	removeAttachment,
+	markAttachmentsAsSent,
+	type Attachment,
+} from "@/integrations/tanstack-store/attachments-store";
+import { AttachmentPreview } from "./AttachmentPreview";
+import { useMutation } from "@tanstack/react-query";
+import { getFile, storeFile, type StoredFile } from "@/lib/indexed-db";
+import { Textarea } from "./ui/textarea";
 
 export const isAutoScrollEnabled = new Store<boolean>(true);
 
@@ -101,19 +113,75 @@ export default function ChatInputBox({
 }) {
 	const navigate = useNavigate();
 	const inputRef = useRef<HTMLTextAreaElement>(null);
+	const fileInputRef = useRef<HTMLInputElement>(null);
 
 	const selectedModelPreferences = useStore(selectedModelPreferencesStore);
+	const unsentAttachments = useStore(attachmentsStore, (state) =>
+		state.filter((attachment) => !attachment.sent),
+	);
 
 	const searchEnabled = useStore(
 		settingsStore,
 		(store) => store.google.config.useSearchGrounding,
 	);
 
+	const uploadAttachmentMutation = useMutation({
+		mutationFn: async ({
+			file,
+			conversationId,
+		}: { file: File; conversationId: string }) => {
+			const formData = new FormData();
+			formData.append("file", file);
+			formData.append("conversationId", conversationId);
+
+			const response = await fetch("/api/attachments/upload", {
+				method: "POST",
+				body: formData,
+			});
+
+			if (!response.ok) {
+				throw new Error("Failed to upload attachment");
+			}
+
+			return response.json();
+		},
+	});
+
 	useEffect(() => {
 		scrollRef?.current && scrollToBottom(scrollRef.current, "instant");
 	}, [conversationId, scrollRef]);
 
-	const handleSend = () => {
+	const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+		const files = Array.from(e.target.files || []);
+		const validFiles = files.filter(
+			(file) =>
+				file.type.startsWith("image/") || file.type === "application/pdf",
+		);
+
+		for (const file of validFiles) {
+			try {
+				const fileId = await storeFile(file);
+				console.log("Stored file with ID:", fileId);
+
+				// Add the attachment to the store
+				addAttachment({
+					id: fileId,
+					name: file.name,
+					type: file.type,
+					timestamp: Date.now(),
+				});
+			} catch (error) {
+				console.error("Error storing file:", error);
+			}
+		}
+		e.target.value = "";
+	};
+
+	const handleRemoveAttachment = (id: string) => {
+		removeAttachment(id);
+	};
+
+	const handleSend = async () => {
 		const input = inputRef.current?.value || "";
 		if (inputRef.current) {
 			inputRef.current.value = "";
@@ -125,12 +193,44 @@ export default function ChatInputBox({
 		const title = input.slice(0, 30) || "New Chat";
 		const convId = conversationId || createConversation(title);
 
+		// Upload all attachments first
+		const uploadedAttachments = await Promise.all(
+			unsentAttachments.map(async (attachment: Attachment) => {
+				const file = await getFile(attachment.id);
+				if (!file) return null;
+
+				const formData = new FormData();
+				formData.append(
+					"file",
+					new File([file.data], file.name, { type: file.type }),
+				);
+				formData.append("conversationId", convId);
+
+        // TODO: env
+				const response = await fetch("http://localhost:3000/upload", {
+					method: "POST",
+					body: formData,
+          credentials: "include",
+				});
+
+				if (!response.ok) {
+					throw new Error("Failed to upload attachment");
+				}
+
+				return attachment.id;
+			}),
+		);
+
+		// Add the message with attachments
 		addMessage(convId, {
 			role: "user",
 			message: input,
 			conversationId: convId,
 			meta_tokens: 0,
+			attachments: uploadedAttachments.map((id) => id as string),
 		});
+
+		markAttachmentsAsSent(uploadedAttachments.map((id) => id as string));
 
 		scrollRef?.current && scrollToBottom(scrollRef.current, "smooth");
 
@@ -145,6 +245,17 @@ export default function ChatInputBox({
 		<div className="flex relative items-center justify-center pb-4">
 			<IsAtBottomButton scrollRef={scrollRef} />
 			<div className="flex flex-col flex-1 items-center border-1 border-t-6 pt-2 rounded-sm max-w-3xl mx-2">
+				{unsentAttachments?.length > 0 && (
+					<div className="flex gap-2 w-full px-2 py-1 overflow-x-auto">
+						{unsentAttachments.map((attachment) => (
+							<AttachmentPreview
+								key={attachment.id}
+								attachment={attachment}
+								onRemove={handleRemoveAttachment}
+							/>
+						))}
+					</div>
+				)}
 				<ChatInput
 					placeholder="Type your message here..."
 					ref={inputRef}
@@ -152,6 +263,36 @@ export default function ChatInputBox({
 						if (e.key === "Enter" && !e.shiftKey) {
 							e.preventDefault();
 							handleSend();
+						}
+					}}
+					onPaste={async (e) => {
+						const items = e.clipboardData?.items;
+						if (!items) return;
+
+						const files: File[] = [];
+						for (const item of items) {
+							if (item.kind === 'file') {
+								const file = item.getAsFile();
+								if (file && (file.type.startsWith('image/') || file.type === 'application/pdf')) {
+									files.push(file);
+								}
+							}
+						}
+
+						for (const file of files) {
+							try {
+								const fileId = await storeFile(file);
+								console.log("Stored pasted file with ID:", fileId);
+
+								addAttachment({
+									id: fileId,
+									name: file.name,
+									type: file.type,
+									timestamp: Date.now(),
+								});
+							} catch (error) {
+								console.error("Error storing pasted file:", error);
+							}
 						}
 					}}
 					className="flex-1 p-2 text-lg! bg-background! border-0! focus:ring-ring/0!"
@@ -194,7 +335,7 @@ export default function ChatInputBox({
 					<Tooltip>
 						<TooltipTrigger
 							asChild
-							className={`${searchEnabled ? "bg-primary" : "bg-card"} flex h-full items-center gap-2 px-2   border-r-2`}
+							className={`${searchEnabled ? "bg-primary" : "bg-card"} flex h-full items-center gap-2 px-2 border-r-2`}
 						>
 							<button type="button" onClick={() => toggleSearch()}>
 								<Globe size={14} />
@@ -205,22 +346,46 @@ export default function ChatInputBox({
 							<ArrowBigUpDash size={14} /> M
 						</TooltipContent>
 					</Tooltip>
-					<Tooltip>
-						<TooltipTrigger
-							asChild
-							className={`${searchEnabled ? "bg-primary" : "bg-card"} flex h-full items-center gap-2 px-2  ml-auto border-l-2`}
-						>
-							<button type="button" className="">
-								Send
-								<div className="flex items-center gap-1 text-xs font-bold p-1">
-									<CornerDownLeft size={10} />
-								</div>
-							</button>
-						</TooltipTrigger>
-						<TooltipContent className="flex items-center gap-1 text-xs font-bold p-1 bg-muted">
-							Send the message
-						</TooltipContent>
-					</Tooltip>
+					<div className="flex items-center ml-auto">
+						<input
+							type="file"
+							ref={fileInputRef}
+							onChange={handleFileSelect}
+							accept="image/*,.pdf"
+							multiple
+							className="hidden"
+						/>
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<button
+									type="button"
+									onClick={() => fileInputRef.current?.click()}
+									className="flex h-full items-center gap-2 px-2 border-r-2"
+								>
+									<Paperclip size={14} />
+								</button>
+							</TooltipTrigger>
+							<TooltipContent className="flex items-center gap-1 text-xs font-bold p-1 bg-muted">
+								Attach files
+							</TooltipContent>
+						</Tooltip>
+						<Tooltip>
+							<TooltipTrigger
+								asChild
+								className="flex h-full items-center gap-2 px-2 border-l-2"
+							>
+								<button type="button" onClick={handleSend}>
+									Send
+									<div className="flex items-center gap-1 text-xs font-bold p-1">
+										<CornerDownLeft size={10} />
+									</div>
+								</button>
+							</TooltipTrigger>
+							<TooltipContent className="flex items-center gap-1 text-xs font-bold p-1 bg-muted">
+								Send the message
+							</TooltipContent>
+						</Tooltip>
+					</div>
 				</div>
 			</div>
 		</div>

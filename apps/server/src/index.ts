@@ -5,6 +5,8 @@ import {
 	migrate,
 	setupSyncEvents,
 	type ChatMessage,
+	attachmentTable,
+	AttachmentEntry,
 } from "l1-db";
 import { and, asc, desc, eq } from "drizzle-orm";
 import db from "l1-db/local";
@@ -69,6 +71,13 @@ const syncEventManager = new SyncEventManager();
 setupSyncEvents(syncEventManager, db);
 const simpleTransport = new SimpleTransport("remote-to-db");
 syncEventManager.addTransport(simpleTransport);
+
+const corsHeaders = {
+	"Access-Control-Allow-Origin": "http://localhost:3001",
+	"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+	"Access-Control-Allow-Headers": "Content-Type, Authorization",
+	"Access-Control-Allow-Credentials": "true",
+};
 
 const server = Bun.serve<{ userId: string; clientId: string }, {}>({
 	routes: {
@@ -154,12 +163,7 @@ const server = Bun.serve<{ userId: string; clientId: string }, {}>({
 			}
 
 			return Response.json(tokenRes.subject.properties, {
-				headers: {
-					"Access-Control-Allow-Origin": "http://localhost:3001",
-					"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-					"Access-Control-Allow-Headers": "Content-Type, Authorization",
-					"Access-Control-Allow-Credentials": "true",
-				},
+				headers: corsHeaders,
 			});
 		},
 		"/sync": async (req: BunRequest) => {
@@ -199,6 +203,105 @@ const server = Bun.serve<{ userId: string; clientId: string }, {}>({
 			return success
 				? undefined
 				: new Response("WebSocket upgrade error", { status: 400 });
+		},
+		"/upload": async (req: BunRequest) => {
+			const access_token = req.cookies.get("access_token");
+			const refresh_token = req.cookies.get("refresh_token");
+			if (!access_token || !refresh_token) {
+				return new Response("Missing token", { status: 400 });
+			}
+
+			const tokenRes = await client.verify(subject, access_token);
+			if (!tokenRes || tokenRes.err) {
+				return new Response(`Invalid token ${tokenRes.err.message}`, {
+					status: 400,
+				});
+			}
+
+			const userId = tokenRes.subject.properties.userId;
+			const formData = await req.formData();
+			const file = formData.get("file") as File;
+			const conversationId = formData.get("conversationId") as string;
+
+			if (!file || !conversationId) {
+				return new Response("Missing file or conversationId", { status: 400 });
+			}
+
+			const fileId = crypto.randomUUID();
+			const fileData = await file.arrayBuffer();
+			const base64Data = Buffer.from(fileData).toString("base64");
+
+			const attachment = {
+				id: fileId,
+				name: file.name,
+				type: file.type,
+				timestamp: Date.now(),
+			};
+
+			// Store in database
+			await db.insert(attachmentTable).values({
+				id: fileId,
+				userId,
+				conversationId,
+				data: attachment,
+				fileData: base64Data,
+			});
+
+			return Response.json(
+				{ id: fileId },
+				{
+					headers: corsHeaders,
+				},
+			);
+		},
+		"/download": async (req: BunRequest) => {
+			const access_token = req.cookies.get("access_token");
+			const refresh_token = req.cookies.get("refresh_token");
+			if (!access_token || !refresh_token) {
+				return new Response("Missing token", { status: 400 });
+			}
+
+			const tokenRes = await client.verify(subject, access_token);
+			if (!tokenRes || tokenRes.err) {
+				return new Response(`Invalid token ${tokenRes.err.message}`, {
+					status: 400,
+				});
+			}
+
+			const userId = tokenRes.subject.properties.userId;
+			const url = new URL(req.url);
+			const conversationId = url.searchParams.get("conversationId");
+			const attachmentId = url.searchParams.get("attachmentId");
+
+			if (!conversationId) {
+				return new Response("Missing conversationId", { status: 400 });
+			}
+
+			let attachments: AttachmentEntry | AttachmentEntry[] | undefined;
+			if (attachmentId) {
+				// Get specific attachment
+				attachments = await db.query.attachmentTable.findFirst({
+					where: and(
+						eq(attachmentTable.userId, userId),
+						eq(attachmentTable.conversationId, conversationId),
+						eq(attachmentTable.id, attachmentId),
+					),
+				});
+				if (!attachments) {
+					return new Response("Attachment not found", { status: 404 });
+				}
+				return Response.json(attachments);
+			}
+			// Get all attachments for conversation
+			attachments = await db.query.attachmentTable.findMany({
+				where: and(
+					eq(attachmentTable.userId, userId),
+					eq(attachmentTable.conversationId, conversationId),
+				),
+			});
+			return Response.json(attachments, {
+				headers: corsHeaders,
+			});
 		},
 	},
 	async fetch(req, server) {

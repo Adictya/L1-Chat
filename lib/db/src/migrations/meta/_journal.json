@@ -15,6 +15,13 @@
       "when": 1749994910011,
       "tag": "0001_brainy_iron_man",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1750129081621,
+      "tag": "0002_fair_radioactive_man",
+      "breakpoints": true
     }
   ]
 }

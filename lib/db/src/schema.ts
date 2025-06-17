@@ -83,6 +83,7 @@ export type ChatMessage = {
   reasoning?: string;
   sources?: Source[];
   parts?: string[];
+  attachments?: string[];
   status?:
     | "submitted"
     | "reasoning"
@@ -125,3 +126,28 @@ export const clientIdTable = pgTable(
 );
 
 export type MessageEntry = typeof chatMessageTable.$inferSelect;
+
+export type Attachment = {
+  id: string;
+  name: string;
+  type: string;
+  timestamp: number;
+};
+
+export const attachmentTable = pgTable(
+  "attachment",
+  {
+    id: varchar("id", { length: 255 }).notNull(),
+    userId: varchar("user_id", { length: 255 }).notNull(),
+    conversationId: varchar("conversation_id", { length: 255 }).notNull(),
+    data: jsonb("data").$type<Attachment>().notNull(),
+    fileData: text("file_data").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.conversationId, table.id] }),
+  })
+);
+
+export type AttachmentEntry = typeof attachmentTable.$inferSelect;

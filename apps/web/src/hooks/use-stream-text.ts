@@ -3,7 +3,9 @@ import {
 	smoothStream,
 	streamText,
 	type CoreMessage,
+	type CoreUserMessage,
 	type FinishReason,
+	type ImagePart,
 	type LanguageModel,
 	type LanguageModelUsage,
 	type Provider,
@@ -30,6 +32,8 @@ import settingsStore, {
 	getSettings,
 	selectedModelPreferencesStore,
 } from "@/integrations/tanstack-store/settings-store";
+import { getFile } from "@/lib/indexed-db";
+import { attachmentsStore } from "@/integrations/tanstack-store/attachments-store";
 
 const getPrompt = () => {
 	return `
@@ -62,10 +66,37 @@ export const generateAnswer = async (
 	try {
 		let content = "";
 		const sources: Source[] = [];
-		const mappedMessages: CoreMessage[] = messageHistory.map((msg) => ({
-			role: msg.role,
-			content: msg.message,
-		}));
+		const mappedMessages: (CoreMessage | CoreUserMessage)[] = [];
+		for (const message of messageHistory) {
+			if (message.attachments) {
+				for (const attachment of message.attachments) {
+					const file = await getFile(attachment);
+
+					if (file) {
+						mappedMessages.push({
+							role: "user",
+							content: [
+								file?.type.startsWith("image/")
+									? {
+											type: "image",
+											image: file.data,
+										}
+									: {
+											type: "file",
+											data: file.data,
+											mimeType: file.type,
+										},
+							],
+						});
+					}
+				}
+			}
+      mappedMessages.push({
+        role: message.role,
+        content: message.message,
+      });
+		}
+
 		mappedMessages.push({
 			role: "user",
 			content: input,

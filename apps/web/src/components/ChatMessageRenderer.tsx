@@ -30,8 +30,15 @@ import {
 	RefreshCw,
 	Split,
 	X,
+	FileText,
 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
+import {
+	attachmentsStore,
+	type Attachment,
+} from "@/integrations/tanstack-store/attachments-store";
+import { getFile } from "@/lib/indexed-db";
+import { AttachmentPreview } from "./AttachmentPreview";
 
 function ChatMessageRenderer({
 	chatMessageStore,
@@ -46,13 +53,19 @@ function ChatMessageRenderer({
 	const message = useStore(chatMessageStore);
 	const [editting, setEditting] = useState(false);
 	const inputRef = useRef<HTMLTextAreaElement>(null);
+	const allAttachments = useStore(attachmentsStore) as Attachment[];
+	const messageAttachments = message.attachments
+		? allAttachments.filter((a: Attachment) =>
+				message.attachments?.includes(a.id),
+			)
+		: [];
 
 	useEffect(() => {
 		if (!scrollRef?.current) return;
 		if (isAutoScrollEnabled.state) {
 			scrollToBottom(scrollRef?.current);
 		}
-	}, [message]);
+	}, [scrollRef?.current]);
 
 	const handleEdit = () => {
 		const input = inputRef.current?.value || "";
@@ -85,12 +98,18 @@ function ChatMessageRenderer({
 		>
 			<div
 				className={cn(
-					"prose prose-lg prose-pink max-w-none dark:prose-invert prose-pre:m-0 prose-pre:bg-transparent prose-pre:p-0",
 					message.role === "user" &&
 						"max-w-full bg-muted text-primary-foreground rounded-l-lg rounded-tr-lg p-4",
-					message.role === "user" && editting && "p-2 flex",
+					message.role === "user" && editting && "p-2 flex flex-col",
 				)}
 			>
+				{messageAttachments.length > 0 && (
+					<div className=" mb-2 flex flex-wrap gap-2">
+						{messageAttachments.map((attachment: Attachment) => (
+							<AttachmentPreview key={attachment.id} attachment={attachment} />
+						))}
+					</div>
+				)}
 				{editting ? (
 					<textarea
 						ref={inputRef}
@@ -112,16 +131,18 @@ function ChatMessageRenderer({
 						}}
 					/>
 				) : (
-					<Markdown
-						remarkPlugins={[remarkGfm]}
-						components={{
-							code: CodeHighlight,
-						}}
-					>
-						{message.status === "generating"
-							? message.parts?.join("")
-							: message.message}
-					</Markdown>
+					<div className="prose prose-lg prose-pink max-w-none dark:prose-invert prose-pre:m-0 prose-pre:bg-transparent prose-pre:p-0">
+						<Markdown
+							remarkPlugins={[remarkGfm]}
+							components={{
+								code: CodeHighlight,
+							}}
+						>
+							{message.status === "generating"
+								? message.parts?.join("")
+								: message.message}
+						</Markdown>
+					</div>
 				)}
 			</div>
 			{message.sources && message.sources.length > 0 && (
@@ -149,13 +170,14 @@ function ChatMessageRenderer({
 					</AccordionItem>
 				</Accordion>
 			)}
-			{(message.status === "submitted" ||
-				(message.status === "generating" && message.parts?.length === 0)) && (
-				<MessageLoading />
-			)}
+			{message.role === "assistant" &&
+				(message.status === "submitted" ||
+					(message.status === "generating" && message.parts?.length === 0)) && (
+					<MessageLoading />
+				)}
 			{(message.status === "stopped" || message.status === "errored") && (
 				<div
-					key={"error" + message.id}
+					key={`error-${message.id}`}
 					className="bg-destructive/80 p-4 border-destructive-foreground rounded-lg"
 				>
 					{message.status === "stopped"
