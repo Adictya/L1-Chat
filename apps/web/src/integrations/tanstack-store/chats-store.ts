@@ -66,22 +66,22 @@ export const syncEventManager = new SyncEventManager();
 // const ws = new WebSocket("ws://localhost:3000/chat");
 // const wsTransport = new ClientWebSocketTransport("ws-transport", ws, getTokens());
 // syncEventManager.addTransport(wsTransport);
-const worker = new Worker();
+// const worker = new Worker();
 
-worker.onmessage = (event) => {
-	console.log("Worker message", event);
-	if (event.data === "Initiate websocket") {
-		console.log("Initiating websocket");
+// worker.onmessage = (event) => {
+// 	console.log("Worker message", event);
+// 	if (event.data === "Initiate websocket") {
+// 		console.log("Initiating websocket");
 		const webSocketTransport = new SimpleWebSocketTransport(
 			"ws-transport",
 			"ws://localhost:3000",
 		);
 		syncEventManager.addTransport(webSocketTransport);
 		webSocketTransport.connect();
-	}
-};
-
-new SyncWorker(worker, "l1-chat-sync");
+// 	}
+// };
+//
+// new SyncWorker(worker, "l1-chat-sync");
 
 // const webSocketTransport = new SimpleWebSocketTransport(
 // 	"ws-transport",
