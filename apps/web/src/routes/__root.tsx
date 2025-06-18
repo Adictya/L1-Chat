@@ -33,6 +33,7 @@ interface MyRouterContext {
 export const Route = createRootRouteWithContext<MyRouterContext>()({
 	loader: async () => {
 		try {
+      if (userDataStore.state.userId) return;
 			const data = await fetch(u("/api/get-user"), {
 				credentials: "include",
 			}).then((res) => res.json());

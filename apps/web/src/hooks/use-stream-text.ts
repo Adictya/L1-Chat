@@ -75,6 +75,7 @@ export const generateAnswer = async (
 		const sources: Source[] = [];
 		const mappedMessages: (CoreMessage | CoreUserMessage)[] = [];
 		for (const message of messageHistory) {
+			if (message.disabled) continue;
 			if (message.attachments) {
 				for (const attachment of message.attachments) {
 					const file = await getFile(attachment);

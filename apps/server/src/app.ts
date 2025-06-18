@@ -1,5 +1,5 @@
 import * as schema from "l1-db-sqlite/schema";
-import { Client, createClient } from "@openauthjs/openauth/client";
+import { Client } from "@openauthjs/openauth/client";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { subject, type User } from "l1-env";
 import { getCookie, setCookie } from "hono/cookie";

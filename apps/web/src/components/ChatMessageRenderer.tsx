@@ -2,6 +2,7 @@ import {
 	clearMessages,
 	createConversationBranch,
 	generateResponse,
+	updateConversation,
 	updateMessage,
 	type ChatMessageStore,
 } from "@/integrations/tanstack-store/chats-store";
@@ -31,6 +32,7 @@ import {
 	Split,
 	X,
 	FileText,
+	BookX,
 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import {
@@ -40,6 +42,10 @@ import {
 import { getFile } from "@/lib/indexed-db";
 import { AttachmentPreview } from "./AttachmentPreview";
 import { ModelsInfo } from "@/integrations/tanstack-store/models-store";
+
+function onlyUnique(value, index, array) {
+	return array.indexOf(value) === index;
+}
 
 function ChatMessageRenderer({
 	chatMessageStore,
@@ -55,13 +61,11 @@ function ChatMessageRenderer({
 	const [editting, setEditting] = useState(false);
 	const inputRef = useRef<HTMLTextAreaElement>(null);
 	const allAttachments = useStore(attachmentsStore) as Attachment[];
-	const messageAttachments =
-		message.attachments && message.attachments.length > 0
-			? allAttachments.filter((a: Attachment) => {
-					console.log("Checking attachment", a.id, message.attachments);
-					return message.attachments?.includes(a.id);
-				})
-			: [];
+	const messageAttachments = message.attachments
+		? message.attachments.map((v) => {
+				return allAttachments.find((attachment) => attachment.id === v);
+			})
+		: [];
 
 	useEffect(() => {
 		if (!scrollRef?.current) return;
@@ -97,6 +101,7 @@ function ChatMessageRenderer({
 				"group",
 				message.role === "user" &&
 					(!editting ? "max-w-[60%] ml-auto" : "w-[60%] ml-auto"),
+				message.disabled && "opacity-50",
 			)}
 		>
 			{(message.status === "reasoning" ||
@@ -131,9 +136,14 @@ function ChatMessageRenderer({
 			>
 				{messageAttachments.length > 0 && (
 					<div className=" mb-2 flex flex-wrap gap-2">
-						{messageAttachments.map((attachment: Attachment) => (
-							<AttachmentPreview key={attachment.id} attachment={attachment} />
-						))}
+						{messageAttachments
+							.filter(onlyUnique)
+							.map((attachment: Attachment) => (
+								<AttachmentPreview
+									key={attachment.id}
+									attachment={attachment}
+								/>
+							))}
 					</div>
 				)}
 				{editting ? (
@@ -219,6 +229,30 @@ function ChatMessageRenderer({
 							message.role === "user" && "justify-end",
 						)}
 					>
+						<Button
+							variant="ghost"
+							size="icon"
+							onClick={() => {
+								updateMessage(
+									message.id,
+									messageIndex,
+									message.conversationId,
+									{
+										disabled: !message.disabled,
+									},
+								);
+								updateConversation(message.conversationId, (prev) => ({
+									meta: {
+										activeTokens:
+											prev.meta.activeTokens +
+											message.meta_tokens * (message.disabled ? 1 : -1),
+										tokens: prev.meta.tokens,
+									},
+								}));
+							}}
+						>
+							<BookX className={message.disabled ? "text-destructive" : ""} />
+						</Button>
 						{message.role === "assistant" ? (
 							<Button
 								variant="ghost"

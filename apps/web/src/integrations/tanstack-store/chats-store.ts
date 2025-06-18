@@ -199,7 +199,9 @@ export function createConversation(title: string, noBroadcast?: boolean) {
 
 export function updateConversation(
 	conversationId: string,
-	data: Partial<Omit<Conversation, "id">>,
+	data:
+		| ((msg: Conversation) => Partial<Omit<Conversation, "id">>)
+		| Partial<Omit<Conversation, "id">>,
 	noBroadcast?: boolean,
 ) {
 	const existingConversation = conversationMapStore.state[conversationId];
@@ -208,7 +210,7 @@ export function updateConversation(
 	}
 	existingConversation.setState((prev) => ({
 		...prev,
-		...data,
+		...(data instanceof Function ? data(prev) : data),
 		id: conversationId,
 		updatedAt: Date.now(),
 	}));

@@ -66,6 +66,7 @@ const IsAtBottomButton = ({
 	// const autoScrollEnabled = useStore(isAutoScrollEnabled);
 	const [isAtBottom, setIsAtBottom] = useState(true);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
 	useEffect(() => {
 		const checkIsAtBottom = (element: Element) => {
 			const { scrollTop, scrollHeight, clientHeight } = element;
@@ -141,7 +142,7 @@ function ConversatioContextWrapper({
 				{conversationData.meta.activeTokens !== conversationData.meta.tokens
 					? `${prettyPrintNumber(conversationData.meta.activeTokens)} / `
 					: ""}
-				{prettyPrintNumber(conversationData.meta.activeTokens)}
+				{prettyPrintNumber(conversationData.meta.tokens)}
 			</TooltipTrigger>
 			<TooltipContent className="flex items-center gap-1 text-xs p-2 bg-muted">
 				Total tokens: {iN(conversationData.meta.tokens)}
@@ -163,6 +164,7 @@ export default function ChatInputBox({
 }) {
 	const navigate = useNavigate();
 	const fileInputRef = useRef<HTMLInputElement>(null);
+	const [isModelsDropdownOpen, setIsModelsDropdownOpen] = useState(false);
 
 	const selectedModelPreferences = useStore(selectedModelPreferencesStore);
 	const unsentAttachments = useStore(attachmentsStore, (state) =>
@@ -173,9 +175,27 @@ export default function ChatInputBox({
 			selectedModelPreferences.provider
 		]?.capabilities;
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
 	useEffect(() => {
 		scrollRef?.current && scrollToBottom(scrollRef.current, "instant");
 	}, [conversationId, scrollRef]);
+
+	// Add keyboard shortcut for opening models dropdown
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			// Check for Cmd+Shift+M (Mac) or Ctrl+Shift+M (Windows/Linux)
+			if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'm') {
+				console.log('Keyboard shortcut detected:', e.key, e.metaKey, e.ctrlKey, e.shiftKey);
+				e.preventDefault();
+				setIsModelsDropdownOpen(true);
+			}
+		};
+
+		document.addEventListener('keydown', handleKeyDown);
+		return () => {
+			document.removeEventListener('keydown', handleKeyDown);
+		};
+	}, []);
 
 	const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
 		const files = Array.from(e.target.files || []);
@@ -234,7 +254,7 @@ export default function ChatInputBox({
 				formData.append("id", attachment.id);
 
 				// TODO: env
-				const response = await fetch(u(`/api/upload`), {
+				const response = await fetch(u("/api/upload"), {
 					method: "POST",
 					body: formData,
 					credentials: "include",
@@ -289,6 +309,7 @@ export default function ChatInputBox({
 					placeholder="Type your message here..."
 					ref={inputRef}
 					onKeyDown={(e) => {
+						console.log("Key down", e, e.metaKey, e.ctrlKey, e.shiftKey, e.key);
 						if (e.key === "Enter" && !e.shiftKey) {
 							e.preventDefault();
 							handleSend();
@@ -331,7 +352,7 @@ export default function ChatInputBox({
 					className="flex-1 p-2 text-lg! bg-background! border-0! focus:ring-ring/0!"
 				/>
 				<div className="flex w-full h-8 items-center text-sm border-t-border border-t-2 bg-muted">
-					<DropdownMenu>
+					<DropdownMenu open={isModelsDropdownOpen} onOpenChange={setIsModelsDropdownOpen}>
 						<DropdownMenuTrigger asChild>
 							<button
 								type="button"
@@ -353,9 +374,22 @@ export default function ChatInputBox({
 									{models.map((model) => (
 										<DropdownMenuItem
 											key={model.id}
-											onClick={() =>
-												updateSelectedModelPreferences(model.id, providerId)
-											}
+											onClick={() => {
+												updateSelectedModelPreferences(model.id, providerId);
+												setIsModelsDropdownOpen(false);
+												inputRef.current?.focus();
+											}}
+											onKeyDown={(e) => {
+												if (e.key === 'Enter') {
+													console.log('Enter key detected');
+													e.preventDefault();
+													updateSelectedModelPreferences(model.id, providerId);
+													setIsModelsDropdownOpen(false);
+													setTimeout(() => {
+														inputRef.current?.focus();
+													}, 0);
+												}
+											}}
 										>
 											{model.name}
 										</DropdownMenuItem>
@@ -396,8 +430,9 @@ export default function ChatInputBox({
 								</button>
 							</TooltipTrigger>
 							<TooltipContent className="flex items-center gap-1 text-xs font-bold p-1 bg-muted">
-								<Command size={10} />
-								<ArrowBigUpDash size={14} /> M
+                Reasoning Effort
+								{/* <Command size={10} /> */}
+								{/* <ArrowBigUpDash size={14} /> M */}
 							</TooltipContent>
 						</Tooltip>
 					)}
@@ -420,8 +455,9 @@ export default function ChatInputBox({
 								</button>
 							</TooltipTrigger>
 							<TooltipContent className="flex items-center gap-1 text-xs font-bold p-1 bg-muted">
-								<Command size={10} />
-								<ArrowBigUpDash size={14} /> M
+                Enable search
+								{/* <Command size={10} /> */}
+								{/* <ArrowBigUpDash size={14} /> M */}
 							</TooltipContent>
 						</Tooltip>
 					)}
