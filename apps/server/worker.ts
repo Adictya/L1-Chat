@@ -7,6 +7,7 @@ import { DbCtx, getHonoApp } from "./src/app";
 import { CloudflareStorage } from "@openauthjs/openauth/storage/cloudflare";
 import { env } from "cloudflare:workers";
 import getApp from "./src/auth";
+import { createClient } from "@openauthjs/openauth/client";
 
 type Bindings = {
 	OPENAUTH_KV: KVNamespace;
@@ -24,9 +25,19 @@ const authApp = getApp(
 	process.env.GITHUB_CLIENT_SECRET,
 );
 
+console.log("frontend", process.env.FRONTEND_URL)
+
 authApp.use(
 	async (c: Context<{ Variables: DbCtx["var"]; Bindings: Bindings }>, next) => {
 		c.set("db", drizzle(env.DB, { schema: schema }));
+
+		const client = createClient({
+			clientID: "nextjs",
+			issuer: process.env.FRONTEND_URL,
+		});
+
+		c.set("openauth", client);
+
 		await next();
 	},
 );

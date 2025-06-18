@@ -1,6 +1,8 @@
 # dependencies (bun install)
 node_modules
 
+.wrangler
+
 # output
 out
 dist
@@ -42,3 +44,4 @@ apps/server/sqlite.db
 .wrangler/state/v3/do/server-ExcalidrawWebSocketServer
 .wrangler/state/v3/kv
 .dev.vars
+.production.vars

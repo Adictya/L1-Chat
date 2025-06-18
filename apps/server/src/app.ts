@@ -1,5 +1,5 @@
 import * as schema from "l1-db-sqlite/schema";
-import { createClient } from "@openauthjs/openauth/client";
+import { Client, createClient } from "@openauthjs/openauth/client";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { subject, type User } from "l1-env";
 import { getCookie, setCookie } from "hono/cookie";
@@ -7,14 +7,11 @@ import { cors } from "hono/cors";
 import type { Context, Hono } from "hono";
 import type { DrizzleD1Database } from "drizzle-orm/d1";
 
-const client = createClient({
-	clientID: "nextjs",
-	issuer: "http://localhost:3000",
-});
-
 export type DbCtx = Context<{
 	Variables: {
 		db: DrizzleD1Database<typeof schema>;
+		openauth: Client;
+		FRONTEND_URL: string;
 	};
 }>;
 type UidCtx = Context<{
@@ -22,15 +19,16 @@ type UidCtx = Context<{
 		userId: string;
 		user: User;
 		db: DrizzleD1Database<typeof schema>;
+		openauth: Client;
 	};
 }>;
 
 export const getHonoApp = (app: Hono) => {
-	app.use(
+	app.use((c, next) =>
 		cors({
-			origin: "http://localhost:3001",
+			origin: process.env.FRONTEND_URL,
 			credentials: true,
-		}),
+		})(c, next),
 	);
 
 	app.use("/api/*", async (c: UidCtx, next) => {
@@ -41,7 +39,7 @@ export const getHonoApp = (app: Hono) => {
 			return c.text("Missing token", 400);
 		}
 
-		const tokenRes = await client.verify(subject, access_token);
+		const tokenRes = await c.var.openauth.verify(subject, access_token);
 		if (!tokenRes || tokenRes.err) {
 			console.log("No res", tokenRes.err.message);
 			return c.text(`Invalid token ${tokenRes.err.message}`, 400);
@@ -64,9 +62,9 @@ export const getHonoApp = (app: Hono) => {
 	});
 
 	// Add routes to Hono app
-	app.get("/login", async (c) => {
-		const url = await client.authorize(
-			"http://localhost:3000/auth-callback",
+	app.get("/login", async (c: DbCtx) => {
+		const url = await c.var.openauth.authorize(
+			`${process.env.FRONTEND_URL}/auth-callback`,
 			"code",
 		);
 
@@ -81,7 +79,7 @@ export const getHonoApp = (app: Hono) => {
 		return c.text("ok", 200);
 	});
 
-	app.get("/auth-callback", async (c) => {
+	app.get("/auth-callback", async (c: UidCtx) => {
 		const url = new URL(c.req.url);
 		const code = url.searchParams.get("code");
 		setCookie(c, "test", "test");
@@ -89,9 +87,9 @@ export const getHonoApp = (app: Hono) => {
 		if (!code) {
 			return c.text("Missing code", 400);
 		}
-		const result = await client.exchange(
+		const result = await c.var.openauth.exchange(
 			code,
-			"http://localhost:3000/auth-callback",
+			`${process.env.FRONTEND_URL}/auth-callback`,
 		);
 
 		if (result.err) {
@@ -102,22 +100,20 @@ export const getHonoApp = (app: Hono) => {
 		const refresh_token = result.tokens.refresh;
 
 		if (access_token && refresh_token) {
-			const result = await client.verify(subject, access_token);
+			const result = await c.var.openauth.verify(subject, access_token);
 			if (!result || result.err) {
 				return c.text(`Invalid token ${result.err.message}`, 400);
 			}
 			setCookie(c, "access_token", access_token, {
 				httpOnly: true,
 				maxAge: 3600 * 24,
-				domain: ".localhost",
 			});
 			setCookie(c, "refresh_token", refresh_token, {
 				httpOnly: true,
 				maxAge: 3600 * 24,
-				domain: ".localhost",
 			});
 
-			const res = c.redirect(c.env.FRONTEND_URL, 302);
+			const res = c.redirect(process.env.FRONTEND_URL, 302);
 
 			return res;
 		}
@@ -245,11 +241,11 @@ export const getHonoApp = (app: Hono) => {
 
 		const conversations = await c.var.db.query.conversation.findMany({
 			where: eq(schema.conversation.userId, userId),
-      orderBy: desc(schema.conversation.updatedAt),
+			orderBy: desc(schema.conversation.updatedAt),
 		});
 		const messages = await c.var.db.query.chatMessageTable.findMany({
 			where: eq(schema.chatMessageTable.userId, userId),
-      orderBy: desc(schema.chatMessageTable.createdAt),
+			orderBy: desc(schema.chatMessageTable.createdAt),
 		});
 		const attachments = await c.var.db.query.attachmentTable.findMany({
 			where: eq(schema.chatMessageTable.userId, userId),
@@ -265,4 +261,4 @@ export const getHonoApp = (app: Hono) => {
 	return app;
 };
 
-export { client, subject };
+export { subject };

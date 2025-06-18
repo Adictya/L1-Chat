@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "server",
+  "name": "l1chat",
   "main": "./apps/server/worker.ts",
   "compatibility_date": "2025-06-08",
   "compatibility_flags": [
@@ -9,7 +9,6 @@
   "vars": {
     "GITHUB_CLIENT_ID": "my-variable",
     "GITHUB_CLIENT_SECRET": "my-variable",
-    "VITE_BACKEND_URL": "http://localhost:3000",
     "FRONTEND_URL": "http://localhost:3000",
   },
   "durable_objects": {
@@ -35,23 +34,12 @@
     }
   ],
   "env": {
-    "dev": {
-      "kv_namespaces": [
-        {
-          "binding": "OPENAUTH_KV",
-          "id": "openauth"
-        }
-      ],
-      "d1_databases": [
-        {
-          "binding": "DB",
-          "database_name": "new_store",
-          "database_id": "1",
-          "migrations_dir": "./apps/server/migrations"
-        }
-      ],
-    },
     "production": {
+      "vars": {
+        "GITHUB_CLIENT_ID": "<prod-keys>",
+        "GITHUB_CLIENT_SECRET": "<prod-keys>",
+        "FRONTEND_URL": "https://l1chat.adictya.workers.dev",
+      },
       "kv_namespaces": [
         {
           "binding": "OPENAUTH_KV",
@@ -66,12 +54,20 @@
           "migrations_dir": "./apps/server/migrations"
         }
       ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "class_name": "ExcalidrawWebSocketServer",
+            "name": "DURABLE_OBJECT"
+          }
+        ]
+      },
     }
   },
   "migrations": [
     {
       "tag": "v1",
-      "new_classes": [
+      "new_sqlite_classes": [
         "ExcalidrawWebSocketServer"
       ]
     }

@@ -97,7 +97,7 @@ export function AppSidebar() {
 									<SidebarMenuItem className="flex flex-row gap-2">
 										<Button
 											onClick={async () => {
-												window.location.href = "http://localhost:3000/login";
+												window.location.href = "/login";
 											}}
 											variant="outline"
 											className="flex-1"
@@ -107,7 +107,7 @@ export function AppSidebar() {
 										</Button>
 										<Button
 											onClick={async () => {
-												window.location.href = "http://localhost:3000/login";
+												window.location.href = "/login";
 											}}
 											variant="outline"
 											size="icon"
