@@ -96,4 +96,5 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			{/* <TanStackQueryLayout /> */}
 		</>
 	),
+	preload: false,
 });

@@ -11,7 +11,6 @@ import db, {
 	type Source, // Keep this for Store typing
 } from "l1-db";
 import { useStore } from "@tanstack/react-store";
-import { useMemo } from "react";
 import { SyncEventManager, BroadcastChannelTransport } from "l1-sync";
 import { SimpleWebSocketTransport } from "l1-sync";
 import { generateAnswer } from "@/hooks/use-stream-text";
@@ -20,9 +19,9 @@ import {
 	selectedModelPreferencesStore,
 	type ModelPreference,
 } from "./settings-store";
-import { getFile } from "@/lib/indexed-db";
-import type { CoreMessage } from "ai";
 import { addAttachment, removeAttachment } from "./attachments-store";
+import Worker from "../../sync/workering?worker";
+import { SyncWorker } from "@/sync/worker";
 
 export type ConversationStore = Store<Conversation>;
 
@@ -67,19 +66,35 @@ export const syncEventManager = new SyncEventManager();
 // const ws = new WebSocket("ws://localhost:3000/chat");
 // const wsTransport = new ClientWebSocketTransport("ws-transport", ws, getTokens());
 // syncEventManager.addTransport(wsTransport);
+const worker = new Worker();
 
-export const webSocketTransport = new SimpleWebSocketTransport(
-	"ws-transport",
-	"ws://localhost:3000",
-);
-syncEventManager.addTransport(webSocketTransport);
-webSocketTransport.connect();
+worker.onmessage = (event) => {
+	console.log("Worker message", event);
+	if (event.data === "Initiate websocket") {
+		console.log("Initiating websocket");
+		const webSocketTransport = new SimpleWebSocketTransport(
+			"ws-transport",
+			"ws://localhost:3000",
+		);
+		syncEventManager.addTransport(webSocketTransport);
+		webSocketTransport.connect();
+	}
+};
 
-// const broadcastChannelTransport = new BroadcastChannelTransport(
-// 	"local-tab-sync",
-// 	"l1-chat-sync-events",
+new SyncWorker(worker, "l1-chat-sync");
+
+// const webSocketTransport = new SimpleWebSocketTransport(
+// 	"ws-transport",
+// 	"ws://localhost:3000",
 // );
-// syncEventManager.addTransport(broadcastChannelTransport);
+// syncEventManager.addTransport(webSocketTransport);
+// webSocketTransport.connect();
+
+const broadcastChannelTransport = new BroadcastChannelTransport(
+	"local-tab-sync",
+	"l1-chat-sync-events",
+);
+syncEventManager.addTransport(broadcastChannelTransport);
 
 export async function PopulateConversations(pg: PGliteWorker) {
 	console.log("Populating conversations");

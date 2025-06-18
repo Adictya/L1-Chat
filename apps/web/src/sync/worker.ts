@@ -52,7 +52,7 @@ export class SyncWorker implements AsyncDisposable {
 	constructor(worker: Worker, id: string) {
 		this.#workerProcess = worker;
 		this.#tabId = crypto.randomUUID();
-    console.log("Worker recieved")
+		console.log("Worker recieved");
 
 		// Wait for worker to signal it's ready
 		this.#workerHerePromise = new Promise<void>((resolve) => {
@@ -147,49 +147,6 @@ export class SyncWorker implements AsyncDisposable {
 		}
 	}
 
-	async #rpc<Method extends RpcMethod>(
-		method: Method,
-		...args: RpcArgs
-	): Promise<RpcResult> {
-		const callId = crypto.randomUUID();
-		const message: RpcCall = {
-			type: "rpc-call",
-			callId,
-			method,
-			args,
-		};
-		this.#tabChannel!.postMessage(message);
-		return await new Promise<RpcResult>((resolve, reject) => {
-			const listener = (event: MessageEvent) => {
-				if (event.data.callId !== callId) return;
-				cleanup();
-				const message: RpcResponse | RpcError = event.data;
-				if (message.type === "rpc-return") {
-					resolve(message.result);
-				} else if (message.type === "rpc-error") {
-					const error = new Error(message.error.message);
-					Object.assign(error, message.error);
-					reject(error);
-				} else {
-					reject(new Error("Invalid message"));
-				}
-			};
-			const leaderChangeListener = () => {
-				cleanup();
-				reject(new LeaderChangedError());
-			};
-			const cleanup = () => {
-				this.#tabChannel!.removeEventListener("message", listener);
-				this.#eventTarget.removeEventListener(
-					"leader-change",
-					leaderChangeListener,
-				);
-			};
-			this.#eventTarget.addEventListener("leader-change", leaderChangeListener);
-			this.#tabChannel!.addEventListener("message", listener);
-		});
-	}
-
 	get waitReady() {
 		return new Promise<void>((resolve) => {
 			this.#initPromise.then(() => {
@@ -245,11 +202,6 @@ export class SyncWorker implements AsyncDisposable {
 	offLeaderChange(callback: () => void) {
 		this.#eventTarget.removeEventListener("leader-change", callback);
 	}
-
-	// Add your custom RPC methods here
-	async customRpcMethod(...args: any[]) {
-		return await this.#rpc("customRpcMethod", ...args);
-	}
 }
 
 export class LeaderChangedError extends Error {
@@ -271,8 +223,12 @@ async function acquireLock(lockId: string) {
 	return release;
 }
 
+export interface WorkerOptions {
+	init: () => void;
+}
+
 // Worker initialization function
-export async function worker() {
+export async function worker({ init }: WorkerOptions) {
 	logger("[Worker] Initializing...");
 	console.log("[Worker] Initializing...");
 	// Signal that worker is ready
@@ -292,7 +248,7 @@ export async function worker() {
 		);
 	});
 
-	logger("[Worker] Received options:", options);
+	// logger("[Worker] Received options:", options);
 
 	// Generate worker ID
 	const id = options.id ?? `${import.meta.url}`;
@@ -312,6 +268,8 @@ export async function worker() {
 	await acquireLock(electionLockId);
 	logger(`[Worker] Acquired leader lock: ${electionLockId}`);
 
+	init();
+
 	// Handle tab connections
 	broadcastChannel.onmessage = async (event) => {
 		const msg = event.data;
@@ -327,31 +285,6 @@ export async function worker() {
 	postMessage({ type: "leader-now" });
 	logger("[Worker] Announced leadership and sent leader-now.");
 
-	// Handle RPC calls
-	function handleRpcCall(tabId: string, msg: RpcCall) {
-		logger(`[Worker] Handling RPC call for tab ${tabId}:`, msg.method, msg.args);
-		const tabChannel = new BroadcastChannel(`l1-sync-tab:${tabId}`);
-
-		// Process RPC call and send response
-		// Add your custom RPC method handlers here
-		if (msg.method === "customRpcMethod") {
-			// Handle custom RPC method
-			logger(`[Worker] Executing customRpcMethod for callId: ${msg.callId}`);
-			tabChannel.postMessage({
-				type: "rpc-return",
-				callId: msg.callId,
-				result: "Custom RPC result",
-			});
-		} else {
-			logger(`[Worker] Method not found for callId: ${msg.callId}`, msg.method);
-			tabChannel.postMessage({
-				type: "rpc-error",
-				callId: msg.callId,
-				error: { message: "Method not found" },
-			});
-		}
-	}
-
 	function connectTab(tabId: string, connectedTabs: Set<string>) {
 		logger(`[Worker] connectTab called for tabId: ${tabId}`);
 		if (connectedTabs.has(tabId)) {
@@ -366,22 +299,15 @@ export async function worker() {
 
 		// Handle tab closure
 		navigator.locks.request(tabCloseLockId, () => {
-			logger(`[Worker] Lock acquired for tab closure: ${tabCloseLockId}. Cleaning up tab ${tabId}.`);
+			logger(
+				`[Worker] Lock acquired for tab closure: ${tabCloseLockId}. Cleaning up tab ${tabId}.`,
+			);
 			return new Promise<void>((resolve) => {
 				tabChannel.close();
 				connectedTabs.delete(tabId);
 				logger(`[Worker] Tab ${tabId} closed and removed from connectedTabs.`);
 				resolve();
 			});
-		});
-
-		// Handle RPC messages
-		tabChannel.addEventListener("message", async (event) => {
-			const msg = event.data;
-			if (msg.type === "rpc-call") {
-				logger(`[Worker] Received rpc-call from tab ${tabId}:`, msg.method);
-				handleRpcCall(tabId, msg);
-			}
 		});
 
 		// Signal connection

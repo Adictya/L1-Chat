@@ -39,13 +39,14 @@ function ConversationItem({
 				asChild
 				className={cn(
 					"flex items-center gap-2 px-3 py-2 w-full rounded-md text-sm transition-colors",
-					isPathActive(`/chats/${conversation.id}`) 
-						? "bg-primary/80 text-primary-foreground" 
-						: "hover:bg-muted"
+					isPathActive(`/chats/${conversation.id}`)
+						? "bg-primary/80 text-primary-foreground"
+						: "hover:bg-muted",
 				)}
 			>
 				<Link
 					to="/chats/$conversationId"
+					preload={false}
 					params={{ conversationId: conversation.id.toString() }}
 					className="flex items-center gap-2 w-full"
 				>
@@ -71,12 +72,12 @@ export function AppSidebar() {
 
 	const handleLogout = async () => {
 		try {
-			await fetch(u('/logout'), {
-				credentials: 'include'
+			await fetch(u("/logout"), {
+				credentials: "include",
 			});
 			window.location.href = u("/login");
 		} catch (error) {
-			console.error('Logout failed:', error);
+			console.error("Logout failed:", error);
 		}
 	};
 
@@ -85,12 +86,8 @@ export function AppSidebar() {
 			<Sidebar>
 				<SidebarContent className="flex flex-col h-full max-h-screen pt-14">
 					<div className="px-2">
-						<Button 
-							className="w-full mb-4 gap-2" 
-							variant="outline"
-							asChild
-						>
-							<Link to="/" className="flex items-center">
+						<Button className="w-full mb-4 gap-2" variant="outline" asChild>
+							<Link to="/" preload={false} className="flex items-center">
 								<Plus className="h-4 w-4" />
 								Create chat
 							</Link>
@@ -129,11 +126,12 @@ export function AppSidebar() {
 									</Button>
 								) : (
 									<div className="flex items-center gap-2">
-										<Link 
-											to="/settings" 
+										<Link
+											to="/settings"
+											preload={false}
 											className={cn(
 												"flex items-center gap-3 px-3 py-2 rounded-md flex-1",
-												"hover:bg-muted transition-colors"
+												"hover:bg-muted transition-colors",
 											)}
 										>
 											<div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
