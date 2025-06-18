@@ -258,7 +258,7 @@ export async function worker({ init }: WorkerOptions) {
 	postMessage({ type: "ready", id });
 	logger("[Worker] Signaled ready state.");
 	// Setup leader election
-	const electionLockId = `l1-sync-election-lock:${id}`;
+	const electionLockId = `l1-sync-election-lock`;
 	const broadcastChannelId = `l1-sync-broadcast:${id}`;
 	const broadcastChannel = new BroadcastChannel(broadcastChannelId);
 	const connectedTabs = new Set<string>();
