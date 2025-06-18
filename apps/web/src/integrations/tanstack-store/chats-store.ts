@@ -418,6 +418,7 @@ export function updateMessageStream(
 			messageIndex,
 			conversationId,
 			part,
+			streamType,
 		});
 	}
 }

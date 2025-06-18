@@ -107,8 +107,7 @@ export const chatMessageTable = sqliteTable(
 	{
 		id: text("id").notNull(),
 		userId: text("user_id").notNull(),
-		conversationId: text("conversation_id")
-			.notNull(),
+		conversationId: text("conversation_id").notNull(),
 		data: text("data", { mode: "json" }).$type<ChatMessage>().notNull(),
 		createdAt: integer("created_at", { mode: "timestamp" })
 			.notNull()
@@ -145,7 +144,7 @@ export type Attachment = {
 	id: string;
 	name: string;
 	type: string;
-  sent: boolean;
+	sent: boolean;
 	timestamp: number;
 };
 
@@ -169,9 +168,16 @@ export const attachmentTable = sqliteTable(
 	}),
 );
 
+export type ApiKeys = {
+	google: string;
+	openai: string;
+	anthropic: string;
+	openrouter: string;
+};
+
 export const apiKeysTable = sqliteTable("api_keys", {
-  userId: text("user_id").primaryKey(),
-	keys: text("key").notNull(),
+	userId: text("user_id").primaryKey(),
+	keys: text("key", { mode: "json" }).$type<ApiKeys>().notNull(),
 	createdAt: integer("created_at", { mode: "timestamp" })
 		.notNull()
 		.default(sql`(unixepoch())`),

@@ -33,13 +33,13 @@ interface MyRouterContext {
 export const Route = createRootRouteWithContext<MyRouterContext>()({
 	loader: async () => {
 		try {
-			const data = await fetch(u(`/api/get-user`), {
+			const data = await fetch(u("/api/get-user"), {
 				credentials: "include",
 			}).then((res) => res.json());
 			console.log("Data", data);
 			userDataStore.setState(data);
 
-			const appData = await fetch(u(`/api/getData`), {
+			const appData = await fetch(u("/api/getData"), {
 				credentials: "include",
 			}).then((res) => res.json());
 			console.log("Data", data, appData);
@@ -77,6 +77,22 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 				updateGeminiApiKey(google);
 				updateClaudeApiKey(anthropic);
 				updateOpenRouterApiKey(openrouter);
+			}
+
+			// Fetch API keys from server and update settings store
+			try {
+				const apiKeysRes = await fetch(u("/api/apiKeys"), {
+					credentials: "include",
+				});
+				if (apiKeysRes.ok) {
+					const apiKeys = await apiKeysRes.json();
+					updateOpenAIApiKey(apiKeys.openai || "");
+					updateGeminiApiKey(apiKeys.google || "");
+					updateClaudeApiKey(apiKeys.anthropic || "");
+					updateOpenRouterApiKey(apiKeys.openrouter || "");
+				}
+			} catch (e) {
+				console.log("Error fetching API keys", e);
 			}
 		} catch (e) {
 			console.log("Error", e);

@@ -1,16 +1,9 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Eye, EyeOff, Save } from "lucide-react";
-import settingsStore, {
-	updateOpenAIApiKey,
-	updateGeminiApiKey,
-	updateClaudeApiKey,
-	updateOpenRouterApiKey,
-} from "../integrations/tanstack-store/settings-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useStore } from "@tanstack/react-store";
 import { useForm } from "react-hook-form";
 import {
 	Form,
@@ -23,6 +16,15 @@ import {
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { syncEventManager } from "@/integrations/tanstack-store/chats-store";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { u } from "@/lib/utils";
+import {
+	updateOpenAIApiKey,
+	updateGeminiApiKey,
+	updateClaudeApiKey,
+	updateOpenRouterApiKey,
+} from "@/integrations/tanstack-store/settings-store";
+import settingsStore from "@/integrations/tanstack-store/settings-store";
 
 // 1. Define the Zod schema
 const settingsSchema = z.object({
@@ -32,6 +34,52 @@ const settingsSchema = z.object({
 	openRouterApiKey: z.string().optional(),
 });
 
+// API key type to match server schema
+type ApiKeys = {
+	openai: string;
+	google: string;
+	anthropic: string;
+	openrouter: string;
+};
+
+// API functions
+const fetchApiKeys = async (): Promise<ApiKeys> => {
+	const response = await fetch(u("/api/apiKeys"), {
+		credentials: "include",
+	});
+	
+	if (response.status === 404) {
+		// No API keys saved yet, return empty keys
+		return {
+			openai: "",
+			google: "",
+			anthropic: "",
+			openrouter: "",
+		};
+	}
+	
+	if (!response.ok) {
+		throw new Error("Failed to fetch API keys");
+	}
+	
+	return response.json();
+};
+
+const saveApiKeys = async (apiKeys: ApiKeys): Promise<void> => {
+	const response = await fetch(u("/api/apiKeys"), {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+		},
+		credentials: "include",
+		body: JSON.stringify(apiKeys),
+	});
+
+	if (!response.ok) {
+		throw new Error("Failed to save API keys");
+	}
+};
+
 export const Route = createFileRoute("/settings")({
 	component: SettingsPage,
 });
@@ -39,40 +87,107 @@ export const Route = createFileRoute("/settings")({
 function SettingsPage() {
 	const navigate = useNavigate();
 	const [showKeys, setShowKeys] = useState(false);
-	const settings = useStore(settingsStore);
+	const queryClient = useQueryClient();
+
+	// Fetch API keys using React Query
+	const localSettings = settingsStore.state;
+	const initialApiKeys = {
+		openai: localSettings.openai?.apiKey || "",
+		google: localSettings.google?.apiKey || "",
+		anthropic: localSettings.anthropic?.apiKey || "",
+		openrouter: localSettings.openrouter?.apiKey || "",
+	};
+	const { data: apiKeys, isLoading, error } = useQuery({
+		queryKey: ["apiKeys"],
+		queryFn: fetchApiKeys,
+		initialData: initialApiKeys,
+	});
+
+	// Save API keys mutation
+	const saveMutation = useMutation({
+		mutationFn: saveApiKeys,
+		onSuccess: (_, variables) => {
+			// Update local settings store
+			updateOpenAIApiKey(variables.openai);
+			updateGeminiApiKey(variables.google);
+			updateClaudeApiKey(variables.anthropic);
+			updateOpenRouterApiKey(variables.openrouter);
+			
+			// Invalidate and refetch API keys
+			queryClient.invalidateQueries({ queryKey: ["apiKeys"] });
+			
+			// Emit sync event for other components
+			syncEventManager.emit<"apiKeyChanged">({
+				type: "apiKeyChanged",
+				keys: Object.values(variables).join(","),
+			});
+		},
+		onError: (error) => {
+			console.error("Error saving API keys:", error);
+		},
+	});
 
 	// 2. Use the schema with react-hook-form
 	const form = useForm<z.infer<typeof settingsSchema>>({
 		resolver: zodResolver(settingsSchema),
 		defaultValues: {
-			openaiApiKey: settings.openai.apiKey,
-			geminiApiKey: settings.google.apiKey,
-			claudeApiKey: settings.anthropic.apiKey,
-			openRouterApiKey: settings.openrouter.apiKey,
+			openaiApiKey: apiKeys?.openai || "",
+			geminiApiKey: apiKeys?.google || "",
+			claudeApiKey: apiKeys?.anthropic || "",
+			openRouterApiKey: apiKeys?.openrouter || "",
 		},
 		mode: "onChange",
 	});
 
+	// Update form when API keys are loaded
+	React.useEffect(() => {
+		if (apiKeys) {
+			form.reset({
+				openaiApiKey: apiKeys.openai || "",
+				geminiApiKey: apiKeys.google || "",
+				claudeApiKey: apiKeys.anthropic || "",
+				openRouterApiKey: apiKeys.openrouter || "",
+			});
+		}
+	}, [apiKeys, form]);
+
 	const { isDirty } = form.formState;
 
-	function onSubmit(values: z.infer<typeof settingsSchema>) {
-		updateOpenAIApiKey(values.openaiApiKey || "");
-		updateGeminiApiKey(values.geminiApiKey || "");
-		updateClaudeApiKey(values.claudeApiKey || "");
-		updateOpenRouterApiKey(values.openRouterApiKey || "");
-
-		const apiKeys = {
+	async function onSubmit(values: z.infer<typeof settingsSchema>) {
+		const apiKeysData = {
 			openai: values.openaiApiKey || "",
 			google: values.geminiApiKey || "",
 			anthropic: values.claudeApiKey || "",
 			openrouter: values.openRouterApiKey || "",
 		};
 
-		syncEventManager.emit<"apiKeyChanged">({
-			type: "apiKeyChanged",
-			keys: Object.values(apiKeys).join(","),
-		});
-		form.reset(values);
+		saveMutation.mutate(apiKeysData);
+	}
+
+	if (isLoading) {
+		return (
+			<div className="min-h-screen flex-1 bg-background p-8">
+				<div className="max-w-2xl mx-auto">
+					<div className="flex items-center justify-center">
+						<div className="text-foreground">Loading...</div>
+					</div>
+				</div>
+			</div>
+		);
+	}
+
+	if (error) {
+		return (
+			<div className="min-h-screen flex-1 bg-background p-8">
+				<div className="max-w-2xl mx-auto">
+					<div className="flex items-center justify-center">
+						<div className="text-foreground text-red-500">
+							Error loading API keys: {error.message}
+						</div>
+					</div>
+				</div>
+			</div>
+		);
 	}
 
 	return (
@@ -122,6 +237,7 @@ function SettingsPage() {
 													id="openai-key"
 													type={showKeys ? "text" : "password"}
 													placeholder="sk-..."
+													disabled={isLoading || saveMutation.isPending}
 												/>
 											</FormControl>
 											<FormMessage />
@@ -141,6 +257,7 @@ function SettingsPage() {
 													id="gemini-key"
 													type={showKeys ? "text" : "password"}
 													placeholder="AIza..."
+													disabled={isLoading || saveMutation.isPending}
 												/>
 											</FormControl>
 											<FormMessage />
@@ -160,6 +277,7 @@ function SettingsPage() {
 													id="claude-key"
 													type={showKeys ? "text" : "password"}
 													placeholder="sk-..."
+													disabled={isLoading || saveMutation.isPending}
 												/>
 											</FormControl>
 											<FormMessage />
@@ -179,6 +297,7 @@ function SettingsPage() {
 													id="openrouter-key"
 													type={showKeys ? "text" : "password"}
 													placeholder="sk-..."
+													disabled={isLoading || saveMutation.isPending}
 												/>
 											</FormControl>
 											<FormMessage />
@@ -188,9 +307,12 @@ function SettingsPage() {
 
 								{isDirty && (
 									<div className="flex justify-end mt-6">
-										<Button type="submit">
+										<Button 
+											type="submit" 
+											disabled={saveMutation.isPending}
+										>
 											<Save className="mr-2 h-4 w-4" />
-											Save Changes
+											{saveMutation.isPending ? "Saving..." : "Save Changes"}
 										</Button>
 									</div>
 								)}

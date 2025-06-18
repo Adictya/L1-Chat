@@ -251,25 +251,54 @@ export const getHonoApp = (app: Hono) => {
 			where: eq(schema.chatMessageTable.userId, userId),
 		});
 
-		const apiKeys = await c.var.db.query.apiKeysTable.findMany({
-			where: eq(schema.chatMessageTable.userId, userId),
-		});
-
-		if (apiKeys.length !== 0) {
-			const apiKey = apiKeys[0].keys;
-			console.log("Apikey", apiKey);
-      if (apiKey.split(",").length !== 4) {
-        console.log("Invalid apikey", apiKey);
-        apiKeys[0].keys = "";
-      }
-		}
-
 		return c.json({
 			conversations: conversations.map((c) => c.data),
 			messages: messages.map((m) => m.data),
 			attachments: attachments.map((a) => a.data),
-			apiKeys: apiKeys.length ? apiKeys[0].keys : "",
 		});
+	});
+
+	app.get("/api/apiKeys", async (c: UidCtx) => {
+		const userId = c.var.userId;
+
+		if (!userId) {
+			return c.text("Missing userId", 400);
+		}
+
+		const apiKeys = await c.var.db.query.apiKeysTable.findFirst({
+			where: eq(schema.chatMessageTable.userId, userId),
+		});
+
+		if (apiKeys) {
+			return c.json(apiKeys.keys);
+		}
+
+		return c.text("No api keys found", 404);
+	});
+
+	app.post("/api/apiKeys", async (c: UidCtx) => {
+		const userId = c.var.userId;
+
+		if (!userId) {
+			return c.text("Missing userId", 400);
+		}
+
+		const apiKeys = await c.req.json<schema.ApiKeys>();
+
+		await c.var.db
+			.insert(schema.apiKeysTable)
+			.values({
+				userId,
+				keys: apiKeys,
+			})
+			.onConflictDoUpdate({
+				target: [schema.apiKeysTable.userId],
+				set: {
+					keys: apiKeys,
+				},
+			});
+
+		return c.text("Api keys updated", 200);
 	});
 
 	return app;

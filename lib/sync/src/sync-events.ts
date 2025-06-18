@@ -147,6 +147,7 @@ export interface GenerateResponseEvent extends BaseSyncEvent {
 	conversationId: string;
 	selectedModel: ModelsEnum;
 	selectedProvider: ProvidersEnum;
+  generationConfig: Record<string, any>;
 }
 
 export interface StopGenerationEvent extends BaseSyncEvent {
