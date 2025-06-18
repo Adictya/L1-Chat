@@ -27,7 +27,7 @@ const authApp = getApp(
 authApp.use(
 	async (c: Context<{ Variables: DbCtx["var"]; Bindings: Bindings }>, next) => {
 		c.set("db", drizzle(env.DB, { schema: schema }));
-		next();
+		await next();
 	},
 );
 

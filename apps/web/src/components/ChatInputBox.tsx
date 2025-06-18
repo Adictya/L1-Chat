@@ -126,28 +126,6 @@ export default function ChatInputBox({
 			selectedModelPreferences.provider
 		]?.capabilities;
 
-	const uploadAttachmentMutation = useMutation({
-		mutationFn: async ({
-			file,
-			conversationId,
-		}: { file: File; conversationId: string }) => {
-			const formData = new FormData();
-			formData.append("file", file);
-			formData.append("conversationId", conversationId);
-
-			const response = await fetch("/api/attachments/upload", {
-				method: "POST",
-				body: formData,
-			});
-
-			if (!response.ok) {
-				throw new Error("Failed to upload attachment");
-			}
-
-			return response.json();
-		},
-	});
-
 	useEffect(() => {
 		scrollRef?.current && scrollToBottom(scrollRef.current, "instant");
 	}, [conversationId, scrollRef]);
@@ -209,7 +187,7 @@ export default function ChatInputBox({
 				formData.append("id", attachment.id);
 
 				// TODO: env
-				const response = await fetch("http://localhost:3000/api/upload", {
+				const response = await fetch(`/api/upload`, {
 					method: "POST",
 					body: formData,
 					credentials: "include",

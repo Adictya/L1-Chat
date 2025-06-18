@@ -70,12 +70,9 @@ export function AttachmentPreview({
 			let file = await getFile(attachment.id);
 			if (!file) {
 				// todo: env
-				const res = await fetch(
-					`http://localhost:3000/api/download?attachmentId=${attachment.id}`,
-					{
-						credentials: "include",
-					},
-				);
+				const res = await fetch(`/api/download?attachmentId=${attachment.id}`, {
+					credentials: "include",
+				});
 
 				const data = await res.json();
 

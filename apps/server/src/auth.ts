@@ -24,10 +24,19 @@ const getGithubUser = async (access_token: string) => {
 		headers: {
 			Accept: "application/json",
 			Authorization: `Bearer ${access_token}`,
+			"User-Agent":
+				"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
 		},
-	}).then((res) => res.json());
+	});
+	if (!userInfoResponse.ok) {
+		throw new Error(
+			`Bad response from github ${await userInfoResponse.text()}`,
+		);
+	}
 
-	const parsedUserResponse = GithubUser.parse(userInfoResponse);
+	const userInfo = await userInfoResponse.json();
+
+	const parsedUserResponse = GithubUser.parse(userInfo);
 
 	return parsedUserResponse;
 };

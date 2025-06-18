@@ -2,10 +2,8 @@ import * as schema from "l1-db-sqlite/schema";
 import { createClient } from "@openauthjs/openauth/client";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { subject, type User } from "l1-env";
-import getApp from "l1-auth/auth";
 import { getCookie, setCookie } from "hono/cookie";
 import { cors } from "hono/cors";
-import type { StorageAdapter } from "@openauthjs/openauth/storage/storage";
 import type { Context, Hono } from "hono";
 import type { DrizzleD1Database } from "drizzle-orm/d1";
 
@@ -119,7 +117,7 @@ export const getHonoApp = (app: Hono) => {
 				domain: ".localhost",
 			});
 
-			const res = c.redirect("http://localhost:3001", 302);
+			const res = c.redirect(c.env.FRONTEND_URL, 302);
 
 			return res;
 		}

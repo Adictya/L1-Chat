@@ -38,3 +38,7 @@ apps/web2/
 apps/server/pg-data
 apps/auth/auth.json
 apps/server/sqlite.db
+.wrangler/state/v3/d1/miniflare-D1DatabaseObject
+.wrangler/state/v3/do/server-ExcalidrawWebSocketServer
+.wrangler/state/v3/kv
+.dev.vars

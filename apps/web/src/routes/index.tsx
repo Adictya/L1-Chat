@@ -18,13 +18,13 @@ export const Route = createFileRoute("/")({
 	component: App,
 	loader: async () => {
 		try {
-			const data = await fetch("http://localhost:3000/api/get-user", {
+			const data = await fetch(`/api/get-user`, {
 				credentials: "include",
 			}).then((res) => res.json());
 			console.log("Data", data);
 			userDataStore.setState(data);
 
-			const appData = await fetch("http://localhost:3000/api/getData", {
+			const appData = await fetch(`/api/getData`, {
 				credentials: "include",
 			}).then((res) => res.json());
 			console.log("Data", data);

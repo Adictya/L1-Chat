@@ -1,0 +1,90 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "server",
+  "main": "./apps/server/worker.ts",
+  "compatibility_date": "2025-06-08",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "vars": {
+    "GITHUB_CLIENT_ID": "my-variable",
+    "GITHUB_CLIENT_SECRET": "my-variable",
+    "VITE_BACKEND_URL": "http://localhost:3000",
+    "FRONTEND_URL": "http://localhost:3000",
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "ExcalidrawWebSocketServer",
+        "name": "DURABLE_OBJECT"
+      }
+    ]
+  },
+  "kv_namespaces": [
+    {
+      "binding": "OPENAUTH_KV",
+      "id": "openauth"
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "new_store",
+      "database_id": "1",
+      "migrations_dir": "./apps/server/migrations"
+    }
+  ],
+  "env": {
+    "dev": {
+      "kv_namespaces": [
+        {
+          "binding": "OPENAUTH_KV",
+          "id": "openauth"
+        }
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "new_store",
+          "database_id": "1",
+          "migrations_dir": "./apps/server/migrations"
+        }
+      ],
+    },
+    "production": {
+      "kv_namespaces": [
+        {
+          "binding": "OPENAUTH_KV",
+          "id": "26ffdf5603e44c7eb07470274f10cf4c"
+        }
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "new_store",
+          "database_id": "0e888bad-e865-4c08-b20a-f539eab30dcc",
+          "migrations_dir": "./apps/server/migrations"
+        }
+      ],
+    }
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": [
+        "ExcalidrawWebSocketServer"
+      ]
+    }
+  ],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "assets": {
+    "directory": "./apps/web/dist"
+  },
+  "build": {
+    "command": "bun run build",
+    "cwd": "./apps/web",
+  }
+}
