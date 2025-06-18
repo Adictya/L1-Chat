@@ -74,6 +74,13 @@ const IsAtBottomButton = ({
 			);
 			return distanceToBottom <= 60;
 		};
+		const checkIsFarAway = (element: Element) => {
+			const { scrollTop, scrollHeight, clientHeight } = element;
+			const distanceToBottom = Math.abs(
+				scrollHeight - scrollTop - clientHeight,
+			);
+			return distanceToBottom >= 180;
+		};
 		let timer = 0;
 		scrollRef?.current?.addEventListener("scroll", (e) => {
 			if (!scrollRef?.current) return;
@@ -148,12 +155,13 @@ function ConversatioContextWrapper({
 export default function ChatInputBox({
 	conversationId,
 	scrollRef,
+	inputRef,
 }: {
 	conversationId?: string;
 	scrollRef: React.RefObject<HTMLDivElement | null>;
+	inputRef: React.RefObject<HTMLTextAreaElement | null>;
 }) {
 	const navigate = useNavigate();
-	const inputRef = useRef<HTMLTextAreaElement>(null);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 
 	const selectedModelPreferences = useStore(selectedModelPreferencesStore);
@@ -251,7 +259,9 @@ export default function ChatInputBox({
 
 		markAttachmentsAsSent(uploadedAttachments.map((id) => id as string));
 
-		scrollRef?.current && scrollToBottom(scrollRef.current, "smooth");
+		setTimeout(() => {
+			scrollRef?.current && scrollToBottom(scrollRef.current, "smooth");
+		}, 500);
 
 		if (!conversationId) {
 			navigate({ to: `/chats/${convId}` });

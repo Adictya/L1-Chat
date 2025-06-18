@@ -66,7 +66,7 @@ function ChatMessageRenderer({
 	useEffect(() => {
 		if (!scrollRef?.current) return;
 		if (isAutoScrollEnabled.state) {
-			scrollToBottom(scrollRef?.current);
+			scrollToBottom(scrollRef?.current, "instant");
 		}
 	}, [message, scrollRef?.current]);
 

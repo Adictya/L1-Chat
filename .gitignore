@@ -38,7 +38,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 apps/web2/
 .opencode
 apps/server/pg-data
-apps/auth/auth.json
+apps/server/auth.json
 apps/server/sqlite.db
 .wrangler/state/v3/d1/miniflare-D1DatabaseObject
 .wrangler/state/v3/do/server-ExcalidrawWebSocketServer

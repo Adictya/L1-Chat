@@ -11,7 +11,7 @@ import {
 	SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Link, useMatchRoute } from "@tanstack/react-router";
-import { GitBranch, LogIn, MessageSquare, Settings } from "lucide-react";
+import { GitBranch, LogIn, LogOut, Plus, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
 	useSubscribeConversations,
@@ -22,6 +22,7 @@ import { client } from "@/integrations/openauth/auth";
 import MessageLoading from "./ui/chat/message-loading";
 import { userDataStore } from "@/integrations/tanstack-store/user-data-store";
 import { u } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 function ConversationItem({
 	conversationStore,
@@ -36,14 +37,20 @@ function ConversationItem({
 		<SidebarMenuItem>
 			<SidebarMenuButton
 				asChild
-				isActive={isPathActive(`/chats/${conversation.id}`)}
+				className={cn(
+					"flex items-center gap-2 px-3 py-2 w-full rounded-md text-sm transition-colors",
+					isPathActive(`/chats/${conversation.id}`) 
+						? "bg-primary/80 text-primary-foreground" 
+						: "hover:bg-muted"
+				)}
 			>
 				<Link
 					to="/chats/$conversationId"
 					params={{ conversationId: conversation.id.toString() }}
+					className="flex items-center gap-2 w-full"
 				>
 					{conversation.branch && <GitBranch className="h-4 w-4" />}
-					<span className="truncate">
+					<span className="truncate flex-1">
 						{conversation.title || "Untitled Chat"}
 					</span>
 					{conversation.generating && (
@@ -60,11 +67,17 @@ function ConversationItem({
 export function AppSidebar() {
 	const conversations = useSubscribeConversations();
 	const matchRoute = useMatchRoute();
-
 	const user = useStore(userDataStore);
 
-	const isPathActive = (itemUrl: string, exactMatch = false): boolean => {
-		return !!matchRoute({ to: itemUrl, fuzzy: !exactMatch });
+	const handleLogout = async () => {
+		try {
+			await fetch(u('/logout'), {
+				credentials: 'include'
+			});
+			window.location.href = u("/login");
+		} catch (error) {
+			console.error('Logout failed:', error);
+		}
 	};
 
 	return (
@@ -72,14 +85,23 @@ export function AppSidebar() {
 			<Sidebar>
 				<SidebarContent className="flex flex-col h-full max-h-screen pt-14">
 					<div className="px-2">
-						<Button className="w-full mb-2" variant="default">
-							<Link to="/">Create chat</Link>
+						<Button 
+							className="w-full mb-4 gap-2" 
+							variant="outline"
+							asChild
+						>
+							<Link to="/" className="flex items-center">
+								<Plus className="h-4 w-4" />
+								Create chat
+							</Link>
 						</Button>
 					</div>
 					<SidebarGroup className="flex-1">
-						<SidebarGroupLabel>Chats</SidebarGroupLabel>
-						<SidebarGroupContent className="flex flex-1 basis-0 overflow-y-auto">
-							<SidebarMenu className="flex-1 basis-0">
+						<SidebarGroupLabel className="px-3 text-xs font-medium text-muted-foreground">
+							Chats
+						</SidebarGroupLabel>
+						<SidebarGroupContent className="flex flex-1 basis-0 overflow-y-auto mt-2">
+							<SidebarMenu className="flex-1 basis-0 px-1 space-y-1">
 								{conversations.map((conversationStore) => (
 									<ConversationItem
 										key={conversationStore.state.id}
@@ -90,46 +112,48 @@ export function AppSidebar() {
 						</SidebarGroupContent>
 					</SidebarGroup>
 
-					<SidebarSeparator className="max-w-[calc(100%-1rem)]" />
+					<SidebarSeparator className="my-2" />
 					<SidebarGroup>
 						<SidebarGroupContent>
-							<SidebarMenu className="pb-2">
+							<SidebarMenu className="px-2 pb-4">
 								{!user.userId ? (
-									<SidebarMenuItem className="flex flex-row gap-2">
-										<Button
-											onClick={async () => {
-												window.location.href = u("/login");
-											}}
-											variant="outline"
-											className="flex-1"
-										>
-											<LogIn className="h-4" />
-											<span>Log In</span>
-										</Button>
-										<Button
-											onClick={async () => {
-												window.location.href = u("/login");
-											}}
-											variant="outline"
-											size="icon"
-											asChild
-										>
-											<Link to="/settings" className="flex flex-row gap-2">
-												<Settings className="h-4" />
-											</Link>
-										</Button>
-									</SidebarMenuItem>
+									<Button
+										onClick={async () => {
+											window.location.href = u("/login");
+										}}
+										variant="outline"
+										className="w-full gap-2"
+									>
+										<LogIn className="h-4 w-4" />
+										<span>Log In</span>
+									</Button>
 								) : (
-									<SidebarMenuItem>
-										<SidebarMenuButton
-											asChild
-											isActive={isPathActive("/settings")}
+									<div className="flex items-center gap-2">
+										<Link 
+											to="/settings" 
+											className={cn(
+												"flex items-center gap-3 px-3 py-2 rounded-md flex-1",
+												"hover:bg-muted transition-colors"
+											)}
 										>
-											<Link to="/settings" className="flex flex-row gap-2">
-												<span className="text-lg">{user.username}</span>
-											</Link>
-										</SidebarMenuButton>
-									</SidebarMenuItem>
+											<div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+												<User className="h-4 w-4" />
+											</div>
+											<div className="flex flex-col min-w-0">
+												<span className="text-sm font-medium truncate">
+													{user.username}
+												</span>
+											</div>
+										</Link>
+										<Button
+											variant="ghost"
+											size="icon"
+											className="text-muted-foreground hover:text-foreground"
+											onClick={handleLogout}
+										>
+											<LogOut className="h-4 w-4" />
+										</Button>
+									</div>
 								)}
 							</SidebarMenu>
 						</SidebarGroupContent>
@@ -137,7 +161,7 @@ export function AppSidebar() {
 				</SidebarContent>
 			</Sidebar>
 			<div className="fixed top-4 left-4 z-50">
-				<SidebarTrigger className="bg-background shadow-lg hover:bg-accent" />
+				<SidebarTrigger className="bg-background/80 backdrop-blur-sm shadow-lg hover:bg-accent rounded-md" />
 			</div>
 		</>
 	);

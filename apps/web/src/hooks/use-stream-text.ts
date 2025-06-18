@@ -204,10 +204,12 @@ export const generateAnswer = async (
 					["promptTokens", "totalTokens", "convActiveTokens", "prompt_tokens"],
 				);
 				updateMessage(msgId, msgIndex - 1, conversationId, {
-					meta_tokens:
+					meta_tokens: Math.max(
 						iN(usage.promptTokens) -
-						convActiveTokens -
-						(msgIndex - 1 === 0 ? prompt_tokens : 0),
+							convActiveTokens -
+							(msgIndex - 1 === 0 ? prompt_tokens : 0),
+						input.includes(" ") ? 2 : 1,
+					),
 				});
 				updateConversation(conversationId, {
 					generating: false,
