@@ -1,4 +1,11 @@
-import { useRef, useState } from "react";
+import { apiKeysTable, Attachment, Source } from "l1-db-sqlite/schema";
+import { SyncEventManager } from "l1-sync";
+import {
+	ModelsEnum,
+	ModelsInfo,
+	Providers,
+	ProvidersEnum,
+} from "l1-sync/types";
 import {
 	smoothStream,
 	streamText,
@@ -12,31 +19,26 @@ import {
 	type StreamTextOnChunkCallback,
 	type Tool,
 } from "ai";
-import { useNavigate } from "@tanstack/react-router";
 import {
-	ModelsInfo,
-	type ModelsEnum,
-	type ProvidersEnum,
-} from "@/integrations/tanstack-store/models-store";
+	createGoogleGenerativeAI,
+	google,
+	type GoogleGenerativeAIProviderOptions,
+} from "@ai-sdk/google";
 import {
-	useSubscribeConversationMessages,
-	createConversation,
-	addMessage,
-	updateMessage,
-	updateMessageStream,
-	updateMessageStreamWithSources,
-	updateConversation,
-	conversationMapStore,
-} from "@/integrations/tanstack-store/chats-store";
-import type { ChatMessage, Source } from "l1-db";
+	createOpenAI,
+	openai,
+	type OpenAIResponsesProviderOptions,
+} from "@ai-sdk/openai";
 import {
-	getProviderConfig,
-	getSettings,
-	type ModelPreference,
-} from "@/integrations/tanstack-store/settings-store";
-import { getFile } from "@/lib/indexed-db";
-import { attachmentsStore } from "@/integrations/tanstack-store/attachments-store";
-import { iN } from "@/lib/utils";
+	createAnthropic,
+	type AnthropicProviderOptions,
+} from "@ai-sdk/anthropic";
+import {
+	createOpenRouter,
+	type OpenRouterProviderOptions,
+} from "@openrouter/ai-sdk-provider";
+import { DrizzleD1Database } from "drizzle-orm/d1";
+import { eq } from "drizzle-orm";
 
 const getPrompt = (selectedModel: ModelsEnum) => {
 	return `
@@ -50,17 +52,49 @@ Present code in Markdown code blocks with the correct language extension indicat
   `;
 };
 
-const prompt_tokens = 158;
+const getFile = async (attachment: Attachment) => {
+	const dbFile = await db.query.attachmentTable.findOne({
+		where: {
+			id: attachment.id,
+		},
+	});
+};
 
-const getProvider = (providerId: ProvidersEnum) => {
-	const provider = getSettings()[providerId];
-	if (!provider) {
-		throw new Error(`Provider ${providerId} not found`);
+const getProvider = async (
+	db: DrizzleD1Database,
+	userId: string,
+	providerId: ProvidersEnum,
+) => {
+	const apiKeys = await db
+		.select()
+		.from(apiKeysTable)
+		.where(eq(apiKeysTable.userId, userId));
+
+	if (!apiKeys || apiKeys.length === 0) {
+		throw new Error("No API keys found");
 	}
-	return provider.provider as Provider;
+
+	const apiKey = apiKeys[0].keys;
+
+	const [google, openai, anthropic, openrouter] = apiKey.split(",");
+
+	switch (providerId) {
+		case Providers.google:
+			return createGoogleGenerativeAI({ apiKey });
+		case Providers.openai:
+			return createOpenAI({ apiKey });
+		case Providers.anthropic:
+			return createAnthropic({ apiKey });
+		case Providers.openrouter:
+			return createOpenRouter({ apiKey });
+		default:
+			throw new Error(`Provider ${providerId} not found`);
+	}
 };
 
 export const generateAnswer = async (
+	db: DrizzleD1Database,
+	userId: string,
 	input: string,
 	conversationId: string,
 	selectedModel: ModelsEnum,
@@ -232,4 +266,8 @@ export const generateAnswer = async (
 	} catch (e) {
 		console.log("Worker error", e);
 	}
+};
+
+const attatchGenerateText = (sync: SyncEventManager) => {
+	sync.on<"generateResponse">("generateResponse", async (eventData) => {});
 };

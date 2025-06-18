@@ -9,7 +9,8 @@
   "vars": {
     "GITHUB_CLIENT_ID": "my-variable",
     "GITHUB_CLIENT_SECRET": "my-variable",
-    "FRONTEND_URL": "http://localhost:3000",
+    "FRONTEND_URL": "http://localhost:3001",
+    "BACKEND_URL": "http://localhost:3000",
   },
   "durable_objects": {
     "bindings": [

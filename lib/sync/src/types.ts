@@ -1,18 +1,204 @@
 export const Models = {
-    Gemini_2_0_Flash: 'Gemini_2_0_Flash',
-    Gemini_2_5_Flash: 'Gemini_2_5_Flash',
-    Gemini_2_5_Pro: 'Gemini_2_5_Pro',
-    Claude_3_5_Sonnet: 'Claude_3_5_Sonnet',
+	Gemini_2_0_Flash: "Gemini_2_0_Flash",
+	Gemini_2_5_Flash: "Gemini_2_5_Flash",
+	Gemini_2_5_Pro: "Gemini_2_5_Pro",
+	Claude_3_5_Sonnet: "Claude_3_5_Sonnet",
+	Gpt_o4_mini: "Gpt_o4_mini",
+	Gpt_4o_mini: "Gpt_4o_mini",
+	Gpt_4_1: "Gpt_4_1",
+	Gpt_4_1_Nano: "Gpt_4_1_Nano",
 } as const satisfies Record<string, string>;
 
-export type ModelsEnum = typeof Models[keyof typeof Models];
-
+export type ModelsEnum = (typeof Models)[keyof typeof Models];
 
 export const Providers = {
-    google: "google",
-    openai: "openai",
-    anthropic: "anthropic",
-    openrouter: "openrouter",
+	google: "google",
+	openai: "openai",
+	anthropic: "anthropic",
+	openrouter: "openrouter",
 } as const;
 
-export type ProvidersEnum = typeof Providers[keyof typeof Providers];
+export type ProvidersEnum = (typeof Providers)[keyof typeof Providers];
+
+export interface ProviderInfo {
+	id: ProvidersEnum;
+	name: string;
+	baseUrl: string;
+}
+
+export const ProvidersInfo = {
+	[Providers.google]: {
+		id: Providers.google,
+		name: "Google",
+		baseUrl: "https://generativelanguage.googleapis.com",
+	},
+	[Providers.openai]: {
+		id: Providers.openai,
+		name: "OpenAI",
+		baseUrl: "https://api.openai.com/v1",
+	},
+	[Providers.anthropic]: {
+		id: Providers.anthropic,
+		name: "Anthropic",
+		baseUrl: "https://api.anthropic.com",
+	},
+	[Providers.openrouter]: {
+		id: Providers.openrouter,
+		name: "OpenRouter",
+		baseUrl: "https://openrouter.ai/api/v1",
+	},
+} as const satisfies Record<ProvidersEnum, ProviderInfo>;
+
+type Capabilities = {
+	search?: boolean;
+	reasoning?: boolean;
+	disableableReasoning?: boolean;
+};
+
+export interface ModelProviderConfig {
+	provider: ProvidersEnum;
+	model: string;
+	capabilities: Capabilities;
+}
+
+export interface ModelConfig {
+	id: ModelsEnum;
+	name: string;
+	providers: Partial<Record<ProvidersEnum, ModelProviderConfig>>;
+}
+
+export const ModelsInfo: Record<ModelsEnum, ModelConfig> = {
+	[Models.Gemini_2_0_Flash]: {
+		id: Models.Gemini_2_0_Flash,
+		name: "Gemini 2.0 Flash",
+		providers: {
+			[Providers.google]: {
+				provider: Providers.google,
+				model: "gemini-2.0-flash",
+				capabilities: {
+					search: true,
+				},
+			},
+		},
+	},
+	[Models.Gemini_2_5_Flash]: {
+		id: Models.Gemini_2_5_Flash,
+		name: "Gemini 2.5 Flash",
+		providers: {
+			[Providers.google]: {
+				provider: Providers.google,
+				model: "gemini-2.5-flash-preview-05-20",
+				capabilities: {
+					search: true,
+					reasoning: true,
+					disableableReasoning: true,
+				},
+			},
+		},
+	},
+	[Models.Gemini_2_5_Pro]: {
+		id: Models.Gemini_2_5_Pro,
+		name: "Gemini 2.5 Pro",
+		providers: {
+			[Providers.google]: {
+				provider: Providers.google,
+				model: "gemini-2.5-pro-preview-06-05",
+				capabilities: {
+					search: true,
+					reasoning: true,
+				},
+			},
+			[Providers.openrouter]: {
+				provider: Providers.openrouter,
+				model: "google/gemini-2.5-pro-preview",
+				capabilities: {
+					reasoning: true,
+				},
+			},
+		},
+	},
+	[Models.Claude_3_5_Sonnet]: {
+		id: Models.Claude_3_5_Sonnet,
+		name: "Claude 3.5 Sonnet",
+		providers: {
+			[Providers.anthropic]: {
+				provider: Providers.anthropic,
+				model: "claude-3-5-sonnet-latest",
+				capabilities: {
+					reasoning: true,
+				},
+			},
+		},
+	},
+	[Models.Gpt_o4_mini]: {
+		id: Models.Gpt_o4_mini,
+		name: "GPT o4 Mini",
+		providers: {
+			[Providers.openai]: {
+				provider: Providers.openai,
+				model: "o4-mini",
+				capabilities: {
+					search: true,
+					reasoning: true,
+				},
+			},
+		},
+	},
+	[Models.Gpt_4o_mini]: {
+		id: Models.Gpt_4o_mini,
+		name: "GPT 4o Mini",
+		providers: {
+			[Providers.openai]: {
+				provider: Providers.openai,
+				model: "gpt-4o-mini",
+				capabilities: {
+					search: true,
+					reasoning: true,
+				},
+			},
+		},
+	},
+	[Models.Gpt_4_1]: {
+		id: Models.Gpt_4_1,
+		name: "GPT 4.1",
+		providers: {
+			[Providers.openai]: {
+				provider: Providers.openai,
+				model: "gpt-4.1",
+				capabilities: {
+					search: true,
+					reasoning: true,
+				},
+			},
+		},
+	},
+	[Models.Gpt_4_1_Nano]: {
+		id: Models.Gpt_4_1_Nano,
+		name: "GPT 4.1 Nano",
+		providers: {
+			[Providers.openai]: {
+				provider: Providers.openai,
+				model: "gpt-4.1-nano",
+				capabilities: {
+					search: true,
+					reasoning: true,
+				},
+			},
+		},
+	},
+} as const satisfies Record<ModelsEnum, ModelConfig>;
+
+// Return a map of providers to models
+export const PerProviderModels = Object.fromEntries(
+	Object.values(ProvidersInfo).map((provider) => [
+		provider.id,
+		Object.values(ModelsInfo).filter((model) => provider.id in model.providers),
+	]),
+) as Record<ProvidersEnum, ModelConfig[]>;
+
+export const PerAvailableModelProvidersList = Object.entries(
+	PerProviderModels,
+).filter(([_, models]) => models.length > 0) as [
+	ProvidersEnum,
+	ModelConfig[],
+][];

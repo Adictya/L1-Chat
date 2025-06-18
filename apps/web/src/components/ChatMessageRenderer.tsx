@@ -19,7 +19,7 @@ import { useEffect, useRef, useState } from "react";
 import { isAutoScrollEnabled } from "./ChatInputBox";
 import { scrollToBottom } from "./ui/chat/hooks/useAutoScroll";
 import MessageLoading from "./ui/chat/message-loading";
-import { cn } from "@/lib/utils";
+import { cn, prettyPrintNumber } from "@/lib/utils";
 import { Button } from "./ui/button";
 import {
 	Check,
@@ -39,6 +39,7 @@ import {
 } from "@/integrations/tanstack-store/attachments-store";
 import { getFile } from "@/lib/indexed-db";
 import { AttachmentPreview } from "./AttachmentPreview";
+import { ModelsInfo } from "@/integrations/tanstack-store/models-store";
 
 function ChatMessageRenderer({
 	chatMessageStore,
@@ -289,9 +290,14 @@ function ChatMessageRenderer({
 						>
 							<Copy className="rotate-180" />
 						</Button>
-						{message.meta_model && (
-							<span>{message.meta_model || "Gemini 2.0 Flash"}</span>
-						)}
+						<div
+							className={`transition-all ${message.role === "user" ? "order-first mr-2" : ""}`}
+						>
+							{message.meta_model && (
+								<span>{ModelsInfo[message.meta_model]?.name} • </span>
+							)}
+							<span>{prettyPrintNumber(message.meta_tokens)} Tks</span>
+						</div>
 					</div>
 				</>
 			)}

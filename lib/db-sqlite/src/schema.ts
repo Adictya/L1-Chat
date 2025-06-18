@@ -169,4 +169,15 @@ export const attachmentTable = sqliteTable(
 	}),
 );
 
+export const apiKeysTable = sqliteTable("api_keys", {
+  userId: text("user_id").primaryKey(),
+	keys: text("key").notNull(),
+	createdAt: integer("created_at", { mode: "timestamp" })
+		.notNull()
+		.default(sql`(unixepoch())`),
+	updatedAt: integer("updated_at", { mode: "timestamp" })
+		.notNull()
+		.default(sql`(unixepoch())`),
+});
+
 export type AttachmentEntry = typeof attachmentTable.$inferSelect;

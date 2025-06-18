@@ -23,6 +23,7 @@ export type SyncEventType =
 	| "stopGeneration"
 	| "addAttachment"
 	| "removeAttachment"
+	| "apiKeyChanged"
 	| "clearMessages";
 
 export interface BaseSyncEvent {
@@ -163,6 +164,15 @@ export interface RemoveAttachmentEvent extends BaseSyncEvent {
 	id: string;
 }
 
+export interface ApiKeyChangedEvent extends BaseSyncEvent {
+	type: "apiKeyChanged";
+  keys: string;
+	// google: string;
+	// openai: string;
+	// anthropic: string;
+	// openrouter: string;
+}
+
 export type SyncEvent =
 	| DummyEvent
 	| CreateConversationEvent
@@ -182,6 +192,7 @@ export type SyncEvent =
 	| GenerateResponseEvent
 	| AddAttachmentEvent
 	| RemoveAttachmentEvent
+	| ApiKeyChangedEvent
 	| StopGenerationEvent;
 
 // Event Handler Types

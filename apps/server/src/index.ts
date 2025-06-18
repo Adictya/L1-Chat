@@ -4,11 +4,12 @@ import * as schema from "l1-db-sqlite/schema";
 import { subject } from "l1-env";
 import { SimpleTransport, SyncEventManager, type SyncEvent } from "l1-sync";
 import type { BunRequest } from "bun";
-import { client, getHonoApp, DbCtx } from "./app";
+import { getHonoApp, DbCtx } from "./app";
 import { MemoryStorage } from "@openauthjs/openauth/storage/memory";
 import { Database } from "bun:sqlite";
 import drizzleConfig from "../drizzle.config";
 import getApp from "./auth";
+import { createClient } from "@openauthjs/openauth/client";
 
 const sqlite = new Database("sqlite.db");
 const db = drizzle({ client: sqlite, schema });
@@ -25,10 +26,16 @@ const authApp = getApp(
 	process.env.GITHUB_CLIENT_SECRET,
 );
 
+const client = createClient({
+	clientID: "nextjs",
+	issuer: process.env.BACKEND_URL,
+});
+
 authApp.use("*", async (c: DbCtx, next) => {
 	console.log("Setting db");
 	// @ts-expect-error: Some issue with drizzle-orm bunsql database type
 	c.set("db", db);
+	c.set("openauth", client);
 	await next();
 });
 

@@ -21,6 +21,7 @@ import { useStore } from "@tanstack/react-store";
 import { client } from "@/integrations/openauth/auth";
 import MessageLoading from "./ui/chat/message-loading";
 import { userDataStore } from "@/integrations/tanstack-store/user-data-store";
+import { u } from "@/lib/utils";
 
 function ConversationItem({
 	conversationStore,
@@ -71,7 +72,7 @@ export function AppSidebar() {
 			<Sidebar>
 				<SidebarContent className="flex flex-col h-full max-h-screen pt-14">
 					<div className="px-2">
-						<Button asChild className="w-full mb-2" variant="default">
+						<Button className="w-full mb-2" variant="default">
 							<Link to="/">Create chat</Link>
 						</Button>
 					</div>
@@ -97,7 +98,7 @@ export function AppSidebar() {
 									<SidebarMenuItem className="flex flex-row gap-2">
 										<Button
 											onClick={async () => {
-												window.location.href = "/login";
+												window.location.href = u("/login");
 											}}
 											variant="outline"
 											className="flex-1"
@@ -107,7 +108,7 @@ export function AppSidebar() {
 										</Button>
 										<Button
 											onClick={async () => {
-												window.location.href = "/login";
+												window.location.href = u("/login");
 											}}
 											variant="outline"
 											size="icon"

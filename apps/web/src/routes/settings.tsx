@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { syncEventManager } from "@/integrations/tanstack-store/chats-store";
 
 // 1. Define the Zod schema
 const settingsSchema = z.object({
@@ -59,6 +60,18 @@ function SettingsPage() {
 		updateGeminiApiKey(values.geminiApiKey || "");
 		updateClaudeApiKey(values.claudeApiKey || "");
 		updateOpenRouterApiKey(values.openRouterApiKey || "");
+
+		const apiKeys = {
+			openai: values.openaiApiKey || "",
+			google: values.geminiApiKey || "",
+			anthropic: values.claudeApiKey || "",
+			openrouter: values.openRouterApiKey || "",
+		};
+
+		syncEventManager.emit<"apiKeyChanged">({
+			type: "apiKeyChanged",
+			keys: Object.values(apiKeys).join(","),
+		});
 		form.reset(values);
 	}
 
@@ -67,10 +80,7 @@ function SettingsPage() {
 			<div className="max-w-2xl mx-auto">
 				<div className="flex items-center justify-between mb-8">
 					<h1 className="text-2xl font-bold text-foreground">Settings</h1>
-					<Button
-						variant="outline"
-						onClick={() => navigate({ to: "/" })}
-					>
+					<Button variant="outline" onClick={() => navigate({ to: "/" })}>
 						Back to Chat
 					</Button>
 				</div>
@@ -85,7 +95,11 @@ function SettingsPage() {
 								onClick={() => setShowKeys(!showKeys)}
 								aria-label={showKeys ? "Hide API keys" : "Show API keys"}
 							>
-								{showKeys ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+								{showKeys ? (
+									<EyeOff className="h-5 w-5" />
+								) : (
+									<Eye className="h-5 w-5" />
+								)}
 							</Button>
 						</div>
 					</CardHeader>
@@ -188,4 +202,3 @@ function SettingsPage() {
 		</div>
 	);
 }
-

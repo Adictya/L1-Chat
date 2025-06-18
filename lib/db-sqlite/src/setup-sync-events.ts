@@ -30,6 +30,31 @@ export function setupSyncEvents(syncEventManager: SyncEventManager, db: DB) {
 		},
 	);
 
+	syncEventManager.on<"deleteConversation">(
+		"deleteConversation",
+		async (eventData) => {
+			const { conversationId, userId } = eventData;
+			if (!userId) {
+				console.error("No user id found");
+				return;
+			}
+			console.log("[DB] Deleting conversation:", conversationId);
+			try {
+				await db
+					.delete(schema.conversation)
+					.where(
+						and(
+							eq(schema.conversation.userId, userId),
+							eq(schema.conversation.id, conversationId),
+						),
+					);
+				console.log("[DB] Conversation deleted:", conversationId);
+			} catch (error) {
+				console.error("Error deleting conversation:", error);
+			}
+		},
+	);
+
 	syncEventManager.on<"addMessage">("addMessage", async (eventData) => {
 		const { message, userId } = eventData;
 		if (!userId) {
@@ -241,6 +266,27 @@ export function setupSyncEvents(syncEventManager: SyncEventManager, db: DB) {
 		} catch (error) {
 			console.error("Error clearing messages:", error);
 		}
+	});
+
+	syncEventManager.on<"apiKeyChanged">("apiKeyChanged", async (eventData) => {
+		const { userId, keys } = eventData;
+		console.log("[DB] Apikey changed", userId, keys);
+		if (!userId) {
+			console.error("No user id found");
+			return;
+		}
+		await db
+			.insert(schema.apiKeysTable)
+			.values({
+				userId,
+				keys,
+			})
+			.onConflictDoUpdate({
+				target: [schema.apiKeysTable.userId],
+				set: {
+					keys,
+				},
+			});
 	});
 
 	// syncEventManager.on<"addAttachment">("addAttachment", async (eventData) => {

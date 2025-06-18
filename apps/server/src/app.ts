@@ -64,7 +64,7 @@ export const getHonoApp = (app: Hono) => {
 	// Add routes to Hono app
 	app.get("/login", async (c: DbCtx) => {
 		const url = await c.var.openauth.authorize(
-			`${process.env.FRONTEND_URL}/auth-callback`,
+			`${process.env.BACKEND_URL}/auth-callback`,
 			"code",
 		);
 
@@ -89,7 +89,7 @@ export const getHonoApp = (app: Hono) => {
 		}
 		const result = await c.var.openauth.exchange(
 			code,
-			`${process.env.FRONTEND_URL}/auth-callback`,
+			`${process.env.BACKEND_URL}/auth-callback`,
 		);
 
 		if (result.err) {
@@ -251,10 +251,24 @@ export const getHonoApp = (app: Hono) => {
 			where: eq(schema.chatMessageTable.userId, userId),
 		});
 
+		const apiKeys = await c.var.db.query.apiKeysTable.findMany({
+			where: eq(schema.chatMessageTable.userId, userId),
+		});
+
+		if (apiKeys.length !== 0) {
+			const apiKey = apiKeys[0].keys;
+			console.log("Apikey", apiKey);
+      if (apiKey.split(",").length !== 4) {
+        console.log("Invalid apikey", apiKey);
+        apiKeys[0].keys = "";
+      }
+		}
+
 		return c.json({
 			conversations: conversations.map((c) => c.data),
 			messages: messages.map((m) => m.data),
 			attachments: attachments.map((a) => a.data),
+			apiKeys: apiKeys.length ? apiKeys[0].keys : "",
 		});
 	});
 

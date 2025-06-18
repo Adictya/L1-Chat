@@ -9,6 +9,7 @@ import {
   primaryKey,
 } from "drizzle-orm/pg-core";
 import type { SyncEvent } from "l1-sync";
+import type { ModelsEnum } from "l1-sync/types";
 
 export const account = pgTable(
   "account",
@@ -78,7 +79,7 @@ export type ChatMessage = {
   updatedAt: number;
   meta_tokens: number;
   role: "assistant" | "user";
-  meta_model?: string;
+  meta_model?: ModelsEnum;
   meta_provider?: string;
   reasoning?: string;
   reasoningParts?: string[];

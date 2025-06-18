@@ -12,6 +12,7 @@ const ChatMessageList = React.forwardRef<HTMLDivElement, ChatMessageListProps>(
 			<div
 				className={`flex flex-col items-center basis-0 flex-1 p-4 overflow-y-auto scroll-auto ${className}`}
 				ref={_ref}
+        id="message-list"
 				style={{
 					flexFlow: "column",
 					WebkitFlexFlow: "column",

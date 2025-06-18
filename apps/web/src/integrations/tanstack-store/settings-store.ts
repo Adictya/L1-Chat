@@ -24,6 +24,7 @@ import {
 	type OpenRouterProviderOptions,
 } from "@openrouter/ai-sdk-provider";
 import type { Provider } from "ai";
+import { syncEventManager } from "./chats-store";
 
 // Save the api keys in the browser's local storage
 const settingsStore = new Store<
@@ -106,13 +107,12 @@ const updatersMap = {
 	[Providers.openrouter]: updateOpenRouterApiKey,
 };
 
-const apiKeys = localStorage.getItem("settings");
-if (apiKeys) {
-	const parsedApiKeys = JSON.parse(apiKeys);
-	for (const [provider, apiKey] of Object.entries(parsedApiKeys)) {
-		updatersMap[provider as ProvidersEnum](apiKey as string);
-	}
-}
+// if (apiKeys) {
+// 	const parsedApiKeys = JSON.parse(apiKeys);
+// 	for (const [provider, apiKey] of Object.entries(parsedApiKeys)) {
+// 		updatersMap[provider as ProvidersEnum](apiKey as string);
+// 	}
+// }
 
 // Save the settings in the browser's local storage
 settingsStore.subscribe((state) => {

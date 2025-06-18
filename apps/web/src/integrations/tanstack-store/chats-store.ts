@@ -668,7 +668,7 @@ syncEventManager.on<"addAttachment">("addAttachment", (eventData) => {
 		attachment,
 	});
 
-	addAttachment(attachment, true);
+	addAttachment(attachment);
 });
 
 syncEventManager.on<"removeAttachment">("removeAttachment", (eventData) => {

@@ -15,6 +15,13 @@
       "when": 1750201203519,
       "tag": "0001_damp_jane_foster",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1750244609267,
+      "tag": "0002_ambitious_spitfire",
+      "breakpoints": true
     }
   ]
 }

@@ -4,7 +4,7 @@ import type { Attachment } from "@/integrations/tanstack-store/attachments-store
 import { FileText, X } from "lucide-react";
 import { Button } from "./ui/button";
 import { AttachmentPreviewDialog } from "./AttachmentPreviewDialog";
-import { cn } from "@/lib/utils";
+import { cn, u } from "@/lib/utils";
 
 export interface AttachmentPreviewProps {
 	attachment: Attachment;
@@ -70,9 +70,12 @@ export function AttachmentPreview({
 			let file = await getFile(attachment.id);
 			if (!file) {
 				// todo: env
-				const res = await fetch(`/api/download?attachmentId=${attachment.id}`, {
-					credentials: "include",
-				});
+				const res = await fetch(
+					u(`/api/download?attachmentId=${attachment.id}`),
+					{
+						credentials: "include",
+					},
+				);
 
 				const data = await res.json();
 

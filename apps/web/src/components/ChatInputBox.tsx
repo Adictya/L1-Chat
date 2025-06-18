@@ -36,6 +36,7 @@ import {
 } from "./ui/dropdown-menu";
 import {
 	addMessage,
+	conversationMapStore,
 	createConversation,
 	generateResponse,
 	type ChatMessageStore,
@@ -53,6 +54,7 @@ import { AttachmentPreview } from "./AttachmentPreview";
 import { useMutation } from "@tanstack/react-query";
 import { getFile, storeFile, type StoredFile } from "@/lib/indexed-db";
 import { Textarea } from "./ui/textarea";
+import { iN, prettyPrintNumber, u } from "@/lib/utils";
 
 export const isAutoScrollEnabled = new Store<boolean>(true);
 
@@ -72,11 +74,17 @@ const IsAtBottomButton = ({
 			);
 			return distanceToBottom <= 60;
 		};
-		scrollRef?.current?.addEventListener("scrollend", (e) => {
+		let timer = 0;
+		scrollRef?.current?.addEventListener("scroll", (e) => {
 			if (!scrollRef?.current) return;
+			if (timer) {
+				clearTimeout(timer);
+			}
 			if (checkIsAtBottom(scrollRef.current)) {
 				isAutoScrollEnabled.setState(true);
-				setIsAtBottom(true);
+				timer = setTimeout(() => {
+					setIsAtBottom(true);
+				}, 500);
 			} else {
 				isAutoScrollEnabled.setState(false);
 				setIsAtBottom(false);
@@ -105,6 +113,38 @@ const IsAtBottomButton = ({
 	);
 };
 
+function ConversatioContextWrapper({
+	conversationId,
+}: { conversationId: string }) {
+	const conversationDataStore = useStore(
+		conversationMapStore,
+		(state) => state[conversationId],
+	);
+
+	const conversationData = useStore(conversationDataStore);
+
+	return (
+		<Tooltip>
+			<TooltipTrigger
+				className={
+					"bg-card flex h-full items-center gap-2 px-2 border-r-2 text-xs"
+				}
+			>
+				Tokens:{" "}
+				{conversationData.meta.activeTokens !== conversationData.meta.tokens
+					? `${prettyPrintNumber(conversationData.meta.activeTokens)} / `
+					: ""}
+				{prettyPrintNumber(conversationData.meta.activeTokens)}
+			</TooltipTrigger>
+			<TooltipContent className="flex items-center gap-1 text-xs p-2 bg-muted">
+				Total tokens: {iN(conversationData.meta.tokens)}
+				<br />
+				Active tokens: {iN(conversationData.meta.activeTokens)}
+			</TooltipContent>
+		</Tooltip>
+	);
+}
+
 export default function ChatInputBox({
 	conversationId,
 	scrollRef,
@@ -120,7 +160,6 @@ export default function ChatInputBox({
 	const unsentAttachments = useStore(attachmentsStore, (state) =>
 		state.filter((attachment) => !attachment.sent),
 	);
-
 	const capabilities =
 		ModelsInfo[selectedModelPreferences.model]?.providers[
 			selectedModelPreferences.provider
@@ -187,7 +226,7 @@ export default function ChatInputBox({
 				formData.append("id", attachment.id);
 
 				// TODO: env
-				const response = await fetch(`/api/upload`, {
+				const response = await fetch(u(`/api/upload`), {
 					method: "POST",
 					body: formData,
 					credentials: "include",
@@ -375,6 +414,9 @@ export default function ChatInputBox({
 								<ArrowBigUpDash size={14} /> M
 							</TooltipContent>
 						</Tooltip>
+					)}
+					{conversationId && (
+						<ConversatioContextWrapper conversationId={conversationId} />
 					)}
 					<div className="flex h-full items-center ml-auto">
 						<Tooltip>
