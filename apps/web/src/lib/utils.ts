@@ -6,7 +6,8 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function u(i: string) {
-	return `http://localhost:3000${i}`;
+	// return `http://localhost:3000${i}`;
+	return i
 }
 
 export const iN = (x: number) => {

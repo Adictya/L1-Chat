@@ -17,7 +17,8 @@
     "dev:auth": "cd apps/auth && bun run dev",
     "dev": "conc \"npm:dev:web\" \"npm:dev:server\"",
     "dev:cf": "conc \"npm:dev:web\" \"npm:dev:server:cf\"",
-    "dev:au": "conc \"npm:dev:web\" \"npm:dev:auth\""
+    "dev:au": "conc \"npm:dev:web\" \"npm:dev:auth\"",
+    "build": "cd apps/web && bun run build"
   },
   "peerDependencies": {
     "typescript": "^5"

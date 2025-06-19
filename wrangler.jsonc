@@ -7,9 +7,7 @@
     "nodejs_compat"
   ],
   "vars": {
-    "GITHUB_CLIENT_ID": "my-variable",
-    "GITHUB_CLIENT_SECRET": "my-variable",
-    "FRONTEND_URL": "http://localhost:3001",
+    "FRONTEND_URL": "http://localhost:3000",
     "BACKEND_URL": "http://localhost:3000",
   },
   "durable_objects": {
@@ -37,9 +35,8 @@
   "env": {
     "production": {
       "vars": {
-        "GITHUB_CLIENT_ID": "<prod-keys>",
-        "GITHUB_CLIENT_SECRET": "<prod-keys>",
         "FRONTEND_URL": "https://l1chat.adictya.workers.dev",
+        "BACKEND_URL": "https://l1chat.adictya.workers.dev",
       },
       "kv_namespaces": [
         {

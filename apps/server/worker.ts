@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/d1";
 import * as schema from "l1-db-sqlite/schema";
-import type { Context } from "hono";
+import { Hono, type Context } from "hono";
 export { ExcalidrawWebSocketServer } from "./object";
 import { z } from "zod";
 import { DbCtx, getHonoApp } from "./src/app";
@@ -19,13 +19,16 @@ const storage = CloudflareStorage({
 	namespace: env.OPENAUTH_KV,
 });
 
-const authApp = getApp(
-	storage,
-	process.env.GITHUB_CLIENT_ID,
-	process.env.GITHUB_CLIENT_SECRET,
-);
+const authApp = new Hono();
 
-console.log("frontend", process.env.FRONTEND_URL)
+// const authApp = getApp(
+// 	storage,
+// 	process.env.GITHUB_CLIENT_ID,
+// 	process.env.GITHUB_CLIENT_SECRET,
+// );
+//
+// console.log("frontend", process.env.FRONTEND_URL);
+//
 
 authApp.use(
 	async (c: Context<{ Variables: DbCtx["var"]; Bindings: Bindings }>, next) => {
@@ -33,7 +36,8 @@ authApp.use(
 
 		const client = createClient({
 			clientID: "nextjs",
-			issuer: process.env.FRONTEND_URL,
+			issuer:
+				"https://openauth-adictya-cloudflareauthscript.adictya.workers.dev",
 		});
 
 		c.set("openauth", client);
@@ -42,7 +46,6 @@ authApp.use(
 	},
 );
 
-// @ts-expect-error: hacking around
 const app = getHonoApp(authApp);
 
 app.get(

@@ -68,11 +68,7 @@ export const getHonoApp = (app: Hono) => {
 			"code",
 		);
 
-		const openAuthReq = new Request(url.url);
-
-		const openAuthRes = await app.fetch(openAuthReq);
-
-		return openAuthRes;
+		return c.redirect(url.url, 302);
 	});
 
 	app.get("/test", async (c) => {
@@ -82,7 +78,6 @@ export const getHonoApp = (app: Hono) => {
 	app.get("/auth-callback", async (c: UidCtx) => {
 		const url = new URL(c.req.url);
 		const code = url.searchParams.get("code");
-		setCookie(c, "test", "test");
 
 		if (!code) {
 			return c.text("Missing code", 400);
