@@ -32,7 +32,9 @@ export const conversationMapStore = new Store<
 export const conversationsListStore = new Derived<ConversationStore[]>({
 	fn: () => {
 		console.log("Conversation list store changed", conversationMapStore.state);
-		return Object.values(conversationMapStore.state);
+		return Object.values(conversationMapStore.state).sort(
+			(a, b) => b.state.updatedAt - a.state.updatedAt,
+		);
 	},
 	deps: [conversationMapStore],
 });

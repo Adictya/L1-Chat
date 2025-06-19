@@ -57,7 +57,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			console.log("Apikeys", apiKeys);
 
 			for (const conversation of conversations.sort(
-				(a, b) => b.updatedAt - a.updatedAt,
+				(a, b) => a.updatedAt - b.updatedAt,
 			)) {
 				createConversationDirect(conversation);
 			}

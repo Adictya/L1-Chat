@@ -39,6 +39,7 @@ import {
 	conversationMapStore,
 	createConversation,
 	generateResponse,
+	stopGeneration,
 	type ChatMessageStore,
 } from "@/integrations/tanstack-store/chats-store";
 import { scrollToBottom } from "./ui/chat/hooks/useAutoScroll";
@@ -55,6 +56,7 @@ import { useMutation } from "@tanstack/react-query";
 import { getFile, storeFile, type StoredFile } from "@/lib/indexed-db";
 import { Textarea } from "./ui/textarea";
 import { iN, prettyPrintNumber, u } from "@/lib/utils";
+import type { Conversation } from "l1-db";
 
 export const isAutoScrollEnabled = new Store<boolean>(true);
 
@@ -166,6 +168,25 @@ export default function ChatInputBox({
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [isModelsDropdownOpen, setIsModelsDropdownOpen] = useState(false);
 
+	const conversationDataStore = useStore(conversationMapStore, (state) =>
+		conversationId
+			? state[conversationId]
+			: new Store<Conversation>({
+					id: "123",
+					generating: false,
+					title: "",
+					branch: false,
+					meta: {
+						activeTokens: 0,
+						tokens: 0,
+					},
+					createdAt: Date.now(),
+					updatedAt: Date.now(),
+				}),
+	);
+
+	const conversationData = useStore(conversationDataStore);
+
 	const selectedModelPreferences = useStore(selectedModelPreferencesStore);
 	const unsentAttachments = useStore(attachmentsStore, (state) =>
 		state.filter((attachment) => !attachment.sent),
@@ -184,16 +205,22 @@ export default function ChatInputBox({
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
 			// Check for Cmd+Shift+M (Mac) or Ctrl+Shift+M (Windows/Linux)
-			if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'm') {
-				console.log('Keyboard shortcut detected:', e.key, e.metaKey, e.ctrlKey, e.shiftKey);
+			if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "m") {
+				console.log(
+					"Keyboard shortcut detected:",
+					e.key,
+					e.metaKey,
+					e.ctrlKey,
+					e.shiftKey,
+				);
 				e.preventDefault();
 				setIsModelsDropdownOpen(true);
 			}
 		};
 
-		document.addEventListener('keydown', handleKeyDown);
+		document.addEventListener("keydown", handleKeyDown);
 		return () => {
-			document.removeEventListener('keydown', handleKeyDown);
+			document.removeEventListener("keydown", handleKeyDown);
 		};
 	}, []);
 
@@ -228,6 +255,11 @@ export default function ChatInputBox({
 	};
 
 	const handleSend = async () => {
+		if (conversationId && conversationData.generating) {
+			stopGeneration(conversationId);
+			return;
+		}
+
 		const input = inputRef.current?.value || "";
 		if (inputRef.current) {
 			inputRef.current.value = "";
@@ -352,7 +384,10 @@ export default function ChatInputBox({
 					className="flex-1 p-2 text-lg! bg-background! border-0! focus:ring-ring/0!"
 				/>
 				<div className="flex w-full h-8 items-center text-sm border-t-border border-t-2 bg-muted">
-					<DropdownMenu open={isModelsDropdownOpen} onOpenChange={setIsModelsDropdownOpen}>
+					<DropdownMenu
+						open={isModelsDropdownOpen}
+						onOpenChange={setIsModelsDropdownOpen}
+					>
 						<DropdownMenuTrigger asChild>
 							<button
 								type="button"
@@ -380,8 +415,8 @@ export default function ChatInputBox({
 												inputRef.current?.focus();
 											}}
 											onKeyDown={(e) => {
-												if (e.key === 'Enter') {
-													console.log('Enter key detected');
+												if (e.key === "Enter") {
+													console.log("Enter key detected");
 													e.preventDefault();
 													updateSelectedModelPreferences(model.id, providerId);
 													setIsModelsDropdownOpen(false);
@@ -430,7 +465,7 @@ export default function ChatInputBox({
 								</button>
 							</TooltipTrigger>
 							<TooltipContent className="flex items-center gap-1 text-xs font-bold p-1 bg-muted">
-                Reasoning Effort
+								Reasoning Effort
 								{/* <Command size={10} /> */}
 								{/* <ArrowBigUpDash size={14} /> M */}
 							</TooltipContent>
@@ -455,7 +490,7 @@ export default function ChatInputBox({
 								</button>
 							</TooltipTrigger>
 							<TooltipContent className="flex items-center gap-1 text-xs font-bold p-1 bg-muted">
-                Enable search
+								Enable search
 								{/* <Command size={10} /> */}
 								{/* <ArrowBigUpDash size={14} /> M */}
 							</TooltipContent>
@@ -497,9 +532,15 @@ export default function ChatInputBox({
 								className="flex h-full items-center gap-2 px-2 pl-3 border-l-2"
 							>
 								<button type="button" onClick={handleSend}>
-									Send
+									{conversationId && conversationData.generating
+										? "Stop"
+										: "Send"}
 									<div className="flex items-center gap-1 text-xs font-bold p-1">
-										<CornerDownLeft size={10} />
+										{conversationId && conversationData.generating ? (
+											<Square size={10} />
+										) : (
+											<CornerDownLeft size={10} />
+										)}
 									</div>
 								</button>
 							</TooltipTrigger>
